@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Power Suits C: Citizen Hero</title>
+<style>
+body {
+  font-family: sans-serif;
+  margin: 40px;
+}
+section {
+  margin-bottom: 20px;
+}
+.quest {
+  border: 1px solid #ccc;
+  padding: 20px;
+  margin-top: 20px;
+}
+.quest h2 {
+  margin-top: 0;
+}
+</style>
+</head>
+<body>
+<h1>Power Suits C: Citizen Hero</h1>
+<section id="form-section">
+  <h2>Forge a Hero Quest</h2>
+  <label>Call sign: <input type="text" id="nickname"></label><br>
+  <label>Age range:
+    <select id="ageRange">
+      <option value="8-11">8–11</option>
+      <option value="12-15">12–15</option>
+      <option value="16-18">16–18</option>
+      <option value="Adult">Adult</option>
+    </select>
+  </label><br>
+  <label>What's bugging you in your world? <br>
+    <textarea id="missionIdea" rows="3" cols="50"></textarea>
+  </label><br>
+  <label>
+    Help mode:<br>
+    <label><input type="radio" name="helpMode" value="supplies" checked> Raise supplies</label><br>
+    <label><input type="radio" name="helpMode" value="awareness"> Raise awareness</label><br>
+    <label><input type="radio" name="helpMode" value="helpers"> Organize helpers</label>
+  </label><br>
+  <button id="generateBtn">Boot Suit</button>
+</section>
+
+<section id="quest-section" style="display: none;">
+  <h2>Mission Brief</h2>
+  <div id="quest-output"></div>
+  <button id="newQuestBtn">Forge Another Quest</button>
+</section>
+
+<script src="script.js"></script>
+</body>
+</html>
