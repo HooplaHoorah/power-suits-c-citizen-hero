@@ -33,55 +33,40 @@ document.getElementById('newQuestBtn').addEventListener('click', () => {
   document.getElementById('form-section').style.display = 'block';
 });
 
-function displayQuest(quest) {
-  const output = document.getElementById('quest-output');
-  output.innerHTML = '';
-  const titleElem = document.createElement('h3');
-  titleElem.textContent = quest.quest_name || 'Hero Quest';
-  output.appendChild(titleElem);
+function displayQuest
 
-  const mission = document.createElement('p');
-  mission.textContent = quest.mission_summary;
-  output.appendChild(mission);
+ test
+// Event listeners for viewing and returning from the Suit Log
 
-  const difficulty = document.createElement('p');
-  difficulty.textContent = `Difficulty: ${quest.difficulty}, Estimated duration: ${quest.estimated_duration_days} days`;
-  output.appendChild(difficulty);
-
-  const stepsList = document.createElement('ol');
-  quest.steps.forEach(step => {
-    const li = document.createElement('li');
-    li.textContent = `${step.title}: ${step.description} (+${step.sgxp_reward} SGXP)`;
-    stepsList.appendChild(li);
-  });
-  output.appendChild(stepsList);
-
-  if (quest.reflection_prompts && quest.reflection_prompts.length > 0) {
-    const reflectionHeading = document.createElement('h4');
-    reflectionHeading.textContent = 'Reflection';
-    output.appendChild(reflectionHeading);
-    const reflectionList = document.createElement('ul');
-    quest.reflection_prompts.forEach(prompt => {
-      const li = document.createElement('li');
-      li.textContent = prompt;
-      reflectionList.appendChild(li);
+document.getElementById('viewLogBtn').addEventListener('click', () => {
+  fetch('/quests')
+    .then(response => response.json())
+    .then(quests => {
+      const logOutput = document.getElementById('log-output');
+      logOutput.innerHTML = '';
+      if (!Array.isArray(quests) || quests.length === 0) {
+        logOutput.textContent = 'No quests found.';
+      } else {
+        quests.forEach((quest) => {
+          const card = document.createElement('div');
+          card.className = 'quest-card';
+          card.innerHTML = `
+            <h4>${quest.quest_name}</h4>
+            <p>${quest.mission_summary}</p>
+          `;
+          logOutput.appendChild(card);
+        });
+      }
+      document.getElementById('quest-section').style.display = 'none';
+      document.getElementById('log-section').style.display = 'block';
+    })
+    .catch(error => {
+      console.error('Error fetching quests:', error);
+      alert('Failed to load your quest log. Please try again.');
     });
-    output.appendChild(reflectionList);
-  }
+});
 
-  if (quest.safety_notes && quest.safety_notes.length > 0) {
-    const safetyHeading = document.createElement('h4');
-    safetyHeading.textContent = 'Safety Notes';
-    output.appendChild(safetyHeading);
-    const safetyList = document.createElement('ul');
-    quest.safety_notes.forEach(note => {
-      const li = document.createElement('li');
-      li.textContent = note;
-      safetyList.appendChild(li);
-    });
-    output.appendChild(safetyList);
-  }
-
-  document.getElementById('form-section').style.display = 'none';
+document.getElementById('backBtn').addEventListener('click', () => {
+  document.getElementById('log-section').style.display = 'none';
   document.getElementById('quest-section').style.display = 'block';
-}
+});
