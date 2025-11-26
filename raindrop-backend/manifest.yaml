@@ -1,0 +1,24 @@
+id: citizen-hero
+name: Citizen Hero API
+version: 0.1.0
+api:
+  - path: /generate-quest
+    method: post
+    description: Generate a hero quest based on user input
+    parameters:
+      - name: age_range
+        in: body
+        type: string
+      - name: mission_idea
+        in: body
+        type: string
+      - name: help_mode
+        in: body
+        type: string
+    responses:
+      200:
+        description: A generated hero quest
+        content:
+          application/json:
+            schema:
+              type: object
