@@ -28,23 +28,37 @@ def init_db():
     conn.close()
 
 
-def save_quest(quest: dict) -> None:
-    """Persist a quest dictionary to the SQLite database."""
+def save_quest(quest: dict) -> int:
+    """Persist a quest dictionary to the SQLite database and return its ID."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("INSERT INTO quests (quest_json) VALUES (?)", (json.dumps(quest),))
+    quest_id = c.lastrowid
     conn.commit()
     conn.close()
+    return quest_id
 
 
 def get_all_quests() -> list:
-    """Retrieve all quests from the database and return them as Python dictionaries."""
+    """Retrieve all quests from the database with their IDs."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("SELECT quest_json FROM quests")
+    c.execute("SELECT id, quest_json FROM quests")
     rows = c.fetchall()
     conn.close()
-    return [json.loads(row[0]) for row in rows]
+    return [dict(id=row[0], **json.loads(row[1])) for row in rows]
+
+
+def get_quest_by_id(quest_id: int):
+    """Retrieve a single quest by its ID."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT quest_json FROM quests WHERE id = ?", (quest_id,))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return json.loads(row[0])
+    return None
 
 
 # Ensure database and table are created when the app starts
@@ -56,8 +70,9 @@ def generate_quest_endpoint():
     """Endpoint to generate a quest from user-provided data and save it to the database."""
     data = request.get_json() or {}
     quest = generate_quest(data)
-    save_quest(quest)
-    return jsonify(quest)
+    quest_id = save_quest(quest)
+    quest_with_id = dict(id=quest_id, **quest)
+    return jsonify(quest_with_id)
 
 
 @app.route('/quests', methods=['GET'])
@@ -65,3 +80,13 @@ def get_quests():
     """Endpoint to retrieve all saved quests from the database."""
     quests = get_all_quests()
     return jsonify(quests)
+
+
+@app.route('/quests/<int:quest_id>', methods=['GET'])
+def get_quest(quest_id):
+    """Endpoint to retrieve a single quest by its ID."""
+    quest = get_quest_by_id(quest_id)
+    if quest is None:
+        return jsonify({"error": "Quest not found"}), 404
+    quest_with_id = dict(id=quest_id, **quest)
+    return jsonify(quest_with_id)
