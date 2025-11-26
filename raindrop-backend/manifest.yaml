@@ -1,14 +1,12 @@
 id: citizen-hero
 name: Citizen Hero API
-version: 0.1.0
+version: 0.2.0
 api:
+  # Generate a new quest based on mission idea and help mode
   - path: /generate-quest
     method: post
     description: Generate a hero quest based on user input
     parameters:
-      - name: age_range
-        in: body
-        type: string
       - name: mission_idea
         in: body
         type: string
@@ -17,8 +15,66 @@ api:
         type: string
     responses:
       200:
-        description: A generated hero quest
+        description: The generated quest with its ID
         content:
           application/json:
             schema:
               type: object
+              properties:
+                id:
+                  type: integer
+                  description: Unique identifier for the quest
+                quest:
+                  type: object
+                  description: The generated quest details
+  # Retrieve all quests
+  - path: /quests
+    method: get
+    description: Get a list of all generated quests
+    responses:
+      200:
+        description: List of quests
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    description: Unique identifier for the quest
+                  quest:
+                    type: object
+                    description: The quest details
+  # Retrieve a specific quest by ID
+  - path: /quests/{quest_id}
+    method: get
+    description: Get a quest by its ID
+    parameters:
+      - name: quest_id
+        in: path
+        required: true
+        type: integer
+    responses:
+      200:
+        description: The requested quest
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                quest:
+                  type: object
+      404:
+        description: Quest not found
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  description: Error message
