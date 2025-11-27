@@ -52,7 +52,9 @@ function displayQuest(quest) {
   questContainer.className = 'quest-card';
 
   // Compute total SGXP from all steps
-  const totalSGXP = quest.steps.reduce((acc, step) => acc + (step.sgxp_reward || 0), 0);
+  const totalSGXP = Array.isArray(quest.steps)
+    ? quest.steps.reduce((acc, step) => acc + (step.sgxp_reward || 0), 0)
+    : 0;
 
   // Build the HTML structure of the quest
   questContainer.innerHTML = `
@@ -62,30 +64,40 @@ function displayQuest(quest) {
     <h4>Steps</h4>
     <ol class="step-list"></ol>
     <h4>Reflection Prompts</h4>
-    <ul class="reflection-list">${quest.reflection_prompts.map(prompt => `<li>${prompt}</li>`).join('')}</ul>
+    <ul class="reflection-list">${
+      Array.isArray(quest.reflection_prompts)
+        ? quest.reflection_prompts.map((prompt) => `<li>${prompt}</li>`).join('')
+        : ''
+    }</ul>
     <h4>Safety Notes</h4>
-    <ul class="safety-list">${quest.safety_notes.map(note => `<li>${note}</li>`).join('')}</ul>
+    <ul class="safety-list">${
+      Array.isArray(quest.safety_notes)
+        ? quest.safety_notes.map((note) => `<li>${note}</li>`).join('')
+        : ''
+    }</ul>
     <p><strong>Total SGXP:</strong> ${totalSGXP}</p>
   `;
 
   // Populate the ordered list with step items containing checkboxes
   const stepList = questContainer.querySelector('.step-list');
-  quest.steps.forEach((step, idx) => {
-    const li = document.createElement('li');
-    li.className = 'step-item';
-    li.innerHTML = `
-      <input type="checkbox" class="step-checkbox" id="step-${idx}" data-reward="${step.sgxp_reward}">
-      <label for="step-${idx}"><strong>${step.title}</strong>: ${step.description} <span class="sgxp-badge">${step.sgxp_reward} SGXP</span></label>
-    `;
-    stepList.appendChild(li);
-  });
+  if (Array.isArray(quest.steps)) {
+    quest.steps.forEach((step, idx) => {
+      const li = document.createElement('li');
+      li.className = 'step-item';
+      li.innerHTML = `
+        <input type="checkbox" class="step-checkbox" id="step-${idx}" data-reward="${step.sgxp_reward}">
+        <label for="step-${idx}"><strong>${step.title}</strong>: ${step.description} <span class="sgxp-badge">${step.sgxp_reward} SGXP</span></label>
+      `;
+      stepList.appendChild(li);
+    });
+  }
 
   // Attach event listeners to update progress when steps are checked
   const progressBar = questContainer.querySelector('.progress-bar');
   const checkboxes = questContainer.querySelectorAll('.step-checkbox');
   function updateProgress() {
     let gained = 0;
-    checkboxes.forEach(cb => {
+    checkboxes.forEach((cb) => {
       if (cb.checked) {
         gained += parseInt(cb.dataset.reward);
       }
@@ -93,7 +105,7 @@ function displayQuest(quest) {
     const ratio = totalSGXP > 0 ? (gained / totalSGXP) * 100 : 0;
     progressBar.style.width = ratio + '%';
   }
-  checkboxes.forEach(cb => {
+  checkboxes.forEach((cb) => {
     cb.addEventListener('change', updateProgress);
   });
 
@@ -107,32 +119,50 @@ function displayQuest(quest) {
 // View log button
 document.getElementById('viewLogBtn').addEventListener('click', () => {
   fetch('/quests')
-    .then(response => response.json())
-    .then(entries => {
+    .then((response) => response.json())
+    .then((entries) => {
       const logOutput = document.getElementById('log-output');
       logOutput.innerHTML = '';
+
       if (!Array.isArray(entries) || entries.length === 0) {
         logOutput.textContent = 'No quests found.';
       } else {
-        entries.forEach(entry => {
-          const { id, quest } = entry;
+        // Compute total SGXP across all quests
+        let cumulativeSGXP = 0;
+        entries.forEach((entry) => {
+          if (Array.isArray(entry.steps)) {
+            entry.steps.forEach((step) => {
+              cumulativeSGXP += step.sgxp_reward || 0;
+            });
+          }
+        });
+        // Show total SGXP earned
+        const totalPara = document.createElement('p');
+        totalPara.innerHTML =
+          '<strong>Total SGXP across quests:</strong> ' + cumulativeSGXP;
+        logOutput.appendChild(totalPara);
+
+        // Display each saved quest summary
+        entries.forEach((entry) => {
+          const { id, quest_name, mission_summary } = entry;
           const card = document.createElement('div');
           card.className = 'quest-card';
           card.innerHTML = `
-            <h4>${quest.quest_name}</h4>
-            <p>${quest.mission_summary}</p>
+            <h4>${quest_name}</h4>
+            <p>${mission_summary}</p>
           `;
           // Click handler to view details of this quest
           card.addEventListener('click', () => {
             fetch(`/quests/${id}`)
-              .then(res => res.json())
-              .then(data => {
+              .then((res) => res.json())
+              .then((data) => {
                 currentQuestId = data.id;
-                displayQuest(data.quest);
+                // Pass the data directly since it has top-level fields
+                displayQuest(data);
                 // Hide log and show quest details
                 document.getElementById('log-section').style.display = 'none';
               })
-              .catch(err => {
+              .catch((err) => {
                 console.error('Error fetching quest details:', err);
                 alert('Failed to load the quest. Please try again.');
               });
@@ -143,7 +173,7 @@ document.getElementById('viewLogBtn').addEventListener('click', () => {
       document.getElementById('quest-section').style.display = 'none';
       document.getElementById('log-section').style.display = 'block';
     })
-    .catch(err => {
+    .catch((err) => {
       console.error('Error fetching quests:', err);
       alert('Failed to load your quest log. Please try again.');
     });
