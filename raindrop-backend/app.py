@@ -1,11 +1,17 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
 from generate_quest import generate_quest
 import sqlite3
 import json
 import os
 
 # Initialize Flask app
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend")),
+    static_url_path="/"
+)
+CORS(app)
 
 # Determine path to the SQLite database relative to this file
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -90,3 +96,7 @@ def get_quest(quest_id):
         return jsonify({"error": "Quest not found"}), 404
     quest_with_id = dict(id=quest_id, **quest)
     return jsonify(quest_with_id)
+# Serve the frontend entry point
+@app.route("/", methods=["GET"])
+def serve_frontend():
+    return send_from_directory(app.static_folder, "index.html")

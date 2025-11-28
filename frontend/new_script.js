@@ -16,7 +16,7 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
   };
 
   try {
-    const response = await fetch('/generate-quest', {
+    const response = await fetch('http://localhost:5000/generate-quest', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -27,7 +27,7 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
     const data = await response.json();
     // Expect data to have shape { id, quest }
     currentQuestId = data.id;
-    displayQuest(data.quest);
+    displayQuest(data);
   } catch (err) {
     alert('Error generating quest. Please try again.');
     console.error(err);
@@ -64,16 +64,14 @@ function displayQuest(quest) {
     <h4>Steps</h4>
     <ol class="step-list"></ol>
     <h4>Reflection Prompts</h4>
-    <ul class="reflection-list">${
-      Array.isArray(quest.reflection_prompts)
-        ? quest.reflection_prompts.map((prompt) => `<li>${prompt}</li>`).join('')
-        : ''
+    <ul class="reflection-list">${Array.isArray(quest.reflection_prompts)
+      ? quest.reflection_prompts.map((prompt) => `<li>${prompt}</li>`).join('')
+      : ''
     }</ul>
     <h4>Safety Notes</h4>
-    <ul class="safety-list">${
-      Array.isArray(quest.safety_notes)
-        ? quest.safety_notes.map((note) => `<li>${note}</li>`).join('')
-        : ''
+    <ul class="safety-list">${Array.isArray(quest.safety_notes)
+      ? quest.safety_notes.map((note) => `<li>${note}</li>`).join('')
+      : ''
     }</ul>
     <p><strong>Total SGXP:</strong> ${totalSGXP}</p>
   `;
