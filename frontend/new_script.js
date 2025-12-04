@@ -46,7 +46,7 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
   };
 
   try {
-    const response = await fetch('http://localhost:5000/clarify-mission', {
+    const response = await fetch(`${API_BASE_URL}/clarify-mission`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(currentMissionPayload),
@@ -112,7 +112,7 @@ document.getElementById('confirmMissionBtn').addEventListener('click', () => {
 // Generate quest from backend
 async function generateQuest(payload) {
   try {
-    const response = await fetch('http://localhost:5000/generate-quest', {
+    const response = await fetch(`${API_BASE_URL}/generate-quest`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -202,7 +202,7 @@ function displayQuest(quest) {
 
 // View log button – shows all saved quests and cumulative SGXP
 document.getElementById('viewLogBtn').addEventListener('click', () => {
-  fetch('/quests')
+  fetch(`${API_BASE_URL}/quests`)
     .then(res => res.json())
     .then(entries => {
       const logOutput = document.getElementById('log-output');
@@ -225,7 +225,7 @@ document.getElementById('viewLogBtn').addEventListener('click', () => {
           card.className = 'quest-card';
           card.innerHTML = `<h4>${quest_name}</h4><p>${mission_summary}</p>`;
           card.addEventListener('click', () => {
-            fetch(`/quests/${id}`)
+            fetch(`${API_BASE_URL}/quests/${id}`)
               .then(r => r.json())
               .then(data => {
                 currentQuestId = data.id;

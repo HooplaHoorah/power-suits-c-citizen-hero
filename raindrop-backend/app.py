@@ -1,9 +1,11 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, make_response
 from flask_cors import CORS
-from generate_quest import generate_quest
-import sqlite3
-import json
+from generate_quest import generate_quest, generate_clarifying_questions
 import os
+import uuid
+
+# Import Postgres DB helper
+import db
 
 # Initialize Flask app
 app = Flask(
@@ -13,90 +15,83 @@ app = Flask(
 )
 CORS(app)
 
-# Determine path to the SQLite database relative to this file
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, 'quests.db')
+# Initialize DB schema on startup (production will have DATABASE_URL set)
+if os.getenv("APP_ENV") == "production":
+    db.init_schema()
+else:
+    # For local dev, fallback to SQLite if DATABASE_URL not set (optional)
+    try:
+        db.init_schema()
+    except Exception as e:
+        print(f"Postgres not configured, skipping DB init: {e}")
 
+@app.route('/healthz', methods=['GET'])
+def healthz():
+    """Simple health‑check endpoint used by deployment platforms."""
+    return jsonify({"status": "ok"}), 200
 
-def init_db():
-    """Create the quests table if it doesn't exist."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute(
-        """
-        CREATE TABLE IF NOT EXISTS quests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            quest_json TEXT NOT NULL
-        )
-        """
-    )
-    conn.commit()
-    conn.close()
+@app.route('/clarify-mission', methods=['POST'])
+def clarify_mission_endpoint():
+    """Endpoint to generate clarifying questions."""
+    data = request.get_json() or {}
+    questions = generate_clarifying_questions(data)
+    return jsonify({"questions": questions})
 
-
-def save_quest(quest: dict) -> int:
-    """Persist a quest dictionary to the SQLite database and return its ID."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("INSERT INTO quests (quest_json) VALUES (?)", (json.dumps(quest),))
-    quest_id = c.lastrowid
-    conn.commit()
-    conn.close()
-    return quest_id
-
-
-def get_all_quests() -> list:
-    """Retrieve all quests from the database with their IDs."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT id, quest_json FROM quests")
-    rows = c.fetchall()
-    conn.close()
-    return [dict(id=row[0], **json.loads(row[1])) for row in rows]
-
-
-def get_quest_by_id(quest_id: int):
-    """Retrieve a single quest by its ID."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT quest_json FROM quests WHERE id = ?", (quest_id,))
-    row = c.fetchone()
-    conn.close()
-    if row:
-        return json.loads(row[0])
-    return None
-
-
-# Ensure database and table are created when the app starts
-init_db()
-
+def _get_session_id():
+    """Retrieve a session identifier for persisting quests.
+    Uses a cookie if present, otherwise generates a UUID and sets it in the response.
+    """
+    session_id = request.cookies.get('session_id')
+    if not session_id:
+        session_id = str(uuid.uuid4())
+    return session_id
 
 @app.route('/generate-quest', methods=['POST'])
 def generate_quest_endpoint():
-    """Endpoint to generate a quest from user-provided data and save it to the database."""
+    """Generate a quest, persist it to Postgres, and return the stored record."""
     data = request.get_json() or {}
     quest = generate_quest(data)
-    quest_id = save_quest(quest)
-    quest_with_id = dict(id=quest_id, **quest)
-    return jsonify(quest_with_id)
+    session_id = _get_session_id()
+    # Insert into Postgres and get generated id/created_at
+    if os.getenv("DATABASE_URL"):
+        try:
+            inserted = db.insert_quest(session_id, quest)
+            quest_with_meta = {"id": inserted["id"], "created_at": inserted["created_at"], **quest}
+        except Exception as e:
+            print(f"DB Insert failed: {e}")
+            # Fallback for when DB is configured but fails
+            quest_with_meta = {"id": 0, "created_at": "local-dev", **quest}
+    else:
+        # Local dev without DB
+        quest_with_meta = {"id": 0, "created_at": "local-dev", **quest}
 
+    resp = make_response(jsonify(quest_with_meta))
+    # Ensure the session cookie is set for the client
+    resp.set_cookie('session_id', session_id, httponly=True, samesite='Lax')
+    return resp
 
 @app.route('/quests', methods=['GET'])
 def get_quests():
-    """Endpoint to retrieve all saved quests from the database."""
-    quests = get_all_quests()
+    """Retrieve all quests for the current session from Postgres."""
+    if not os.getenv("DATABASE_URL"):
+        return jsonify([])
+    session_id = _get_session_id()
+    quests = db.list_quests(session_id)
     return jsonify(quests)
-
 
 @app.route('/quests/<int:quest_id>', methods=['GET'])
 def get_quest(quest_id):
-    """Endpoint to retrieve a single quest by its ID."""
-    quest = get_quest_by_id(quest_id)
+    """Retrieve a single quest by its ID from Postgres."""
+    quest = db.get_quest_by_id(quest_id)
     if quest is None:
         return jsonify({"error": "Quest not found"}), 404
-    quest_with_id = dict(id=quest_id, **quest)
-    return jsonify(quest_with_id)
+    return jsonify(quest)
+
 # Serve the frontend entry point
-@app.route("/", methods=["GET"])
+@app.route("/", methods=["GET"]) 
 def serve_frontend():
     return send_from_directory(app.static_folder, "index.html")
+
+if __name__ == '__main__':
+    # Default to debug mode for local development
+    app.run(debug=True, port=5000)

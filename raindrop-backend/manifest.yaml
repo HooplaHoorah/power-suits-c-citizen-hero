@@ -1,6 +1,12 @@
 id: citizen-hero
 name: Citizen Hero API
 version: 0.2.0
+
+env:
+  RAINDROP_API_URL: "${RAINDROP_API_URL}"
+  RAINDROP_API_KEY: "${RAINDROP_API_KEY}"
+  DATABASE_URL: "${DATABASE_URL}"
+  APP_ENV: "production"
 api:
   # Generate a new quest based on mission idea and help mode
   - path: /generate-quest

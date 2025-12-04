@@ -6,3 +6,10 @@ dist/
 __pycache__/
 *.pyc
 .DS_Store
+*.pyo
+*.pyd
+*.sqlite3
+.env.*
+.idea/
+.vscode/
+*.log
