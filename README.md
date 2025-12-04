@@ -39,3 +39,5 @@ RAINDROP_API_URL=<your-raindrop-endpoint>
 RAINDROP_API_KEY=<your-secret-api-key>
 ```
 When both environment variables are present at runtime, the backend automatically sends your mission idea and clarifying details to Raindrop's SmartInference endpoint. The response is used to generate richer, more varied quests. Leaving these variables unset keeps all generation local and avoids any external API calls or billing. **Do not commit your API keys**.
+
+© 2025 Hoopla Hoorah. Power Suits C™, Citizen Hero™, Super Greatness Experience Points™, and SGXP™ are trademarks of Hoopla Hoorah. All rights reserved. Created by Richard A. Morgan.
