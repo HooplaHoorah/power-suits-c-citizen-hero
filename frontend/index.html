@@ -1,449 +1,197 @@
 <!DOCTYPE html>
-
 <html lang="en">
 
- <head>
-
-  <meta charset="utf-8"/>
-
-  <title>
-
-   Power Suits C: Citizen Hero
-
-  </title>
-
-  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-
+<head>
+  <meta charset="utf-8" />
+  <title>Power Suits C&trade;: Citizen Hero&trade;</title>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
   <style>
-
-   /* Base page styling */
-
+    /* Base page styling */
     body {
-
       font-family: sans-serif;
-
       margin: 0;
-
       padding: 0;
-
       background: #f5f5f5;
-
       line-height: 1.5;
-
     }
 
     .container {
-
       max-width: 800px;
-
       margin: 0 auto;
-
       padding: 20px;
-
       background: #fff;
-
       border-radius: 8px;
-
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-
     }
 
     h1 {
-
       margin-top: 0;
-
     }
 
     /* Form styles */
-
     .form-group {
-
       margin-bottom: 15px;
-
     }
 
     .form-group label {
-
       font-weight: bold;
-
       display: block;
-
       margin-bottom: 5px;
-
     }
 
     .form-group input,
-
     .form-group select,
-
     .form-group textarea {
-
       width: 100%;
-
       padding: 8px;
-
       border: 1px solid #ccc;
-
       border-radius: 4px;
-
       box-sizing: border-box;
-
     }
 
     .hint {
-
       display: block;
-
       font-size: 0.85em;
-
       color: #666;
-
       margin-top: 4px;
-
     }
 
     .radio-group label {
-
       display: block;
-
       margin: 4px 0;
-
     }
 
     button {
-
       background: #007acc;
-
       color: #fff;
-
       border: none;
-
       padding: 10px 20px;
-
       border-radius: 4px;
-
       cursor: pointer;
-
       font-size: 1em;
-
     }
 
     button:hover {
-
       background: #005fa3;
-
     }
 
     /* Quest card styles */
-
     .quest-card {
-
       border: 1px solid #ccc;
-
       border-radius: 6px;
-
       padding: 20px;
-
       background: #fafafa;
-
       margin-top: 20px;
-
     }
 
     .quest-card h3 {
-
       margin-top: 0;
-
     }
 
     .sgxp-badge {
-
       background: #2196F3;
-
       color: #fff;
-
       border-radius: 10px;
-
       padding: 2px 6px;
-
       font-size: 0.8em;
-
       margin-left: 4px;
-
     }
 
     .progress-container {
-
       background: #e0e0e0;
-
       border-radius: 4px;
-
       overflow: hidden;
-
       height: 12px;
-
       margin: 10px 0;
-
     }
 
     .progress-bar {
-
       height: 100%;
-
       width: 0;
-
       background: #4caf50;
-
       transition: width 0.3s ease;
-
     }
 
     @media (max-width: 600px) {
-
       .container {
-
         padding: 10px;
-
       }
 
       button {
-
         width: 100%;
-
       }
-
     }
-
   </style>
+</head>
 
- </head>
-
- <body>
-
+<body>
   <div class="container">
-
-   <h1>
-
-    Power Suits C: Citizen Hero
-
-   </h1>
-
-   <section id="form-section">
-
-    <h2>
-
-     Forge Your Hero Mission
-
-    </h2>
-
-    <p class="hint">
-
-     <strong>
-
-      Suit OS JayNova:
-
-     </strong>
-
-     I'm here to help you forge your mission! Share a few details below and I'll craft a quest just for you.
-
-    </p>
-
-    <div class="form-group">
-
-     <label for="nickname">
-
-      Call sign
-
-     </label>
-
-     <input id="nickname" type="text"/>
-
-     <span class="hint">
-
-      Choose a fun hero alias for yourself.
-
-     </span>
-
-    </div>
-
-    <div class="form-group">
-
-     <label for="ageRange">
-
-      Age range
-
-     </label>
-
-     <select id="ageRange">
-
-      <option value="8-11">
-
-       8–11
-
-      </option>
-
-      <option value="12-15">
-
-       12–15
-
-      </option>
-
-      <option value="16-18">
-
-       16–18
-
-      </option>
-
-      <option value="Adult">
-
-       Adult
-
-      </option>
-
-     </select>
-
-     <span class="hint">
-
-      This helps tailor your mission to your comfort level.
-
-     </span>
-
-    </div>
-
-    <div class="form-group">
-
-     <label for="missionIdea">
-
-      What's bugging you in your world?
-
-     </label>
-
-     <textarea id="missionIdea" rows="3"></textarea>
-
-     <span class="hint">
-
-      Share a challenge in your community, school, environment or anything else you care about.
-
-     </span>
-
-    </div>
-
-    <div class="form-group">
-
-     <label>
-
-      Help mode
-
-     </label>
-
-     <span class="hint">
-
-      How would you like to help your cause?
-
-     </span>
-
-     <div class="radio-group">
-
-      <label>
-
-       <input checked="" name="helpMode" type="radio" value="supplies"/>
-
-       Raise supplies – gather resources or donations.
-
-      </label>
-
-      <label>
-
-       <input name="helpMode" type="radio" value="awareness"/>
-
-       Raise awareness – spread the word about the issue.
-
-      </label>
-
-      <label>
-
-       <input name="helpMode" type="radio" value="helpers"/>
-
-       Organize helpers – rally people to join the mission.
-
-      </label>
-
-     </div>
-
-    </div>
-
-    <p class="hint">
-
-     <strong>
-
-      Safety first:
-
-     </strong>
-
-     If you're under 18, enlist a trusted adult before taking on your mission.
-
-    </p>
-
-    <button id="generateBtn">
-
-     Boot Suit
-
-    </button>
-
-   </section>
-
-   <section id="quest-section" style="display: none;">
-
-    <h2>
-
-     Mission Brief
-
-    </h2>
-
-    <div id="quest-output">
-
-    </div>
-
-    <button id="newQuestBtn">
-
-     Forge Another Quest
-
-    </button>
-
-    <button id="viewLogBtn">
-
-     View Suit Log
-
-    </button>
-
-   </section>
-
-   <section id="log-section" style="display: none;">
-
-    <h2>
-
-     Suit Logs
-
-    </h2>
-
-    <div id="log-output">
-
-    </div>
-
-    <button id="backBtn">
-
-     Back to Mission
-
-    </button>
-
-   </section>
-
+    <h1>Power Suits C&trade;: Citizen Hero&trade;</h1>
+    <section id="form-section">
+      <h2>Forge Your Hero Mission</h2>
+      <p class="hint"><strong>Suit OS JayNova:</strong> I'm here to help you forge your mission! Share a few details
+        below and I'll craft a quest just for you.</p>
+      <div class="form-group">
+        <label for="nickname">Call sign</label>
+        <input id="nickname" type="text" />
+        <span class="hint">Choose a fun hero alias for yourself.</span>
+      </div>
+      <div class="form-group">
+        <label for="ageRange">Age range</label>
+        <select id="ageRange">
+          <option value="8-11">8–11</option>
+          <option value="12-15">12–15</option>
+          <option value="16-18">16–18</option>
+          <option value="Adult">Adult</option>
+        </select>
+        <span class="hint">This helps tailor your mission to your comfort level.</span>
+      </div>
+      <div class="form-group">
+        <label for="missionIdea">What's bugging you in your world?</label>
+        <textarea id="missionIdea" rows="3"></textarea>
+        <span class="hint">Share a challenge in your community, school, environment or anything else you care
+          about.</span>
+      </div>
+      <div class="form-group">
+        <label>Help mode</label>
+        <span class="hint">How would you like to help your cause?</span>
+        <div class="radio-group">
+          <label><input checked="" name="helpMode" type="radio" value="supplies" /> Raise supplies – gather resources or
+            donations.</label>
+          <label><input name="helpMode" type="radio" value="awareness" /> Raise awareness – spread the word about the
+            issue.</label>
+          <label><input name="helpMode" type="radio" value="helpers" /> Organize helpers – rally people to join the
+            mission.</label>
+        </div>
+      </div>
+      <p class="hint"><strong>Safety first:</strong> If you're under 18, enlist a trusted adult before taking on your
+        mission.</p>
+      <button id="generateBtn">Boot Suit</button>
+    </section>
+    <section id="clarify-section" style="display: none;">
+      <h2>Clarifying Questions</h2>
+      <p class="hint"><strong>Suit OS JayNova:</strong> I have a few questions to make sure I understand your mission
+        correctly.</p>
+      <div id="questions-container"></div>
+      <button id="confirmMissionBtn">Confirm Mission</button>
+    </section>
+    <section id="quest-section" style="display: none;">
+      <h2>Mission Brief</h2>
+      <div id="quest-output"></div>
+      <button id="newQuestBtn">Forge Another Quest</button>
+      <button id="viewLogBtn">View Suit Log</button>
+    </section>
+    <section id="log-section" style="display: none;">
+      <h2>Suit Logs</h2>
+      <div id="log-output"></div>
+      <button id="backBtn">Back to Mission</button>
+    </section>
+    <footer class="text-center text-muted mt-4 mb-3" style="font-size: 0.8rem;">
+      &copy; 2025 Hoopla Hoorah. Power Suits C&trade;, Citizen Hero&trade;, Super Greatness Experience Points&trade;,
+      and SGXP&trade; are trademarks of Hoopla Hoorah. All rights reserved. Created by Richard A. Morgan.
+    </footer>
   </div>
-
-  <script src="new_script.js">
-
-  </script>
-
- </body>
+  <script src="new_script.js"></script>
+</body>
 
 </html>
