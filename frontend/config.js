@@ -1,10 +1,9 @@
 // config.js – central API base URL for the frontend
 // Adjust the production URL as needed when deployed.
-const API_BASE_URL = (function () {
-    // If running on localhost (dev), use the local Flask server.
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        return 'http://localhost:5000';
-    }
-    // Production URL – replace with the actual Raindrop‑deployed backend URL.
-    return 'https://140.82.9.200.sslip.io';
-})();
+export function getApiBaseUrl() {
+  if (window.location.hostname.includes('localhost')) {
+    return 'http://127.0.0.1:5000';
+  }
+  // Vultr backend
+  return 'https://140.82.9.200.sslip.io';
+}
