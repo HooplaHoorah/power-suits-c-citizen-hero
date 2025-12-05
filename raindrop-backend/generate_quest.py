@@ -85,3 +85,27 @@ def generate_quest(data):
     }
 
     return quest
+
+
+def generate_clarifying_questions(data):
+    """
+    Generate clarifying questions to help refine the mission.
+    """
+    mission_idea = data.get('mission_idea', '').strip()
+    help_mode = data.get('help_mode', 'supplies')
+    
+    # Mock questions based on help mode
+    questions = [
+        "Who is the specific beneficiary of this mission?",
+        "What is your timeline for completing this?",
+    ]
+    
+    if help_mode == 'supplies':
+        questions.append("What kind of supplies are most needed?")
+    elif help_mode == 'awareness':
+        questions.append("Who is your target audience for raising awareness?")
+    elif help_mode == 'helpers':
+        questions.append("How many helpers do you think you need?")
+        
+    return questions
+
