@@ -8,6 +8,16 @@ This document explains how to download, install and run the Citizen Hero prototy
 - Git installed (to clone the repository)
 - Optional: Node.js and npm are **not** required because the frontend is plain HTML
 
+## Quick start (default path)
+
+git clone https://github.com/HooplaHoorah/power-suits-c-citizen-hero.git
+cd power-suits-c-citizen-hero
+python -m venv .venv && .venv\Scripts\activate  # or source .venv/bin/activate
+pip install flask flask-cors python-dotenv requests
+cd raindrop-backend
+python app.py     # then open the printed URL in your browser
+
+
 ## Clone the repository
 
 ```bash
