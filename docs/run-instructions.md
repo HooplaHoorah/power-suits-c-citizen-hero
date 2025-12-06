@@ -66,14 +66,18 @@ The quest generator works locally out of the box using a rule‑based logic. To 
 3. Open `.env` and fill in your RAINDROP and database variables (do **not** share these or commit them to Git):
 
 ```ini
-RRAINDROP_API_URL=https://<your-raindrop-endpoint>
+RRAINROP_API_URL=https://<your-raindrop-endpoint>
 RAINDROP_API_KEY=<your-raindrop-api-key>
 # Optional: connection string for your PostgreSQL database
 DATABASE_URL=postgresql://<username>:<password>@<host>:<port>/<database>
 # Application environment
 APP_ENV=production
+~~~
+
 
 If these variables are present, the backend will call Raindrop to generate quests. If they are missing, the backend falls back to the rule‑based generator.
+```
+
 
 ## Run the backend
 
