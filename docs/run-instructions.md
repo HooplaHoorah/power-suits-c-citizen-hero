@@ -62,13 +62,16 @@ pip install -r raindrop-backend/requirements.txt
 The quest generator works locally out of the box using a rule‑based logic. To upgrade it to use Raindrop SmartInference, you need credentials from LiquidMetal Raindrop:
 
 1. Create a Raindrop account at <https://liquidmetal.run> and generate an API key.
-2. In the `raindrop-backend` directory create a file named `.env`.
-3. Add the following variables to `.env` (do **not** share these or commit them to Git):
+2. In the `raindrop-backend` directory copy the `.env.example` file to `.env`.
+3. Open `.env` and fill in your RAINDROP and database variables (do **not** share these or commit them to Git):
 
 ```ini
-RAINDROP_API_URL=https://<raindrop-base-url>
-RAINDROP_API_KEY=<your-api-key>
-```
+RRAINDROP_API_URL=https://<your-raindrop-endpoint>
+RAINDROP_API_KEY=<your-raindrop-api-key>
+# Optional: connection string for your PostgreSQL database
+DATABASE_URL=postgresql://<username>:<password>@<host>:<port>/<database>
+# Application environment
+APP_ENV=production
 
 If these variables are present, the backend will call Raindrop to generate quests. If they are missing, the backend falls back to the rule‑based generator.
 
