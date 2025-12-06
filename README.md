@@ -69,7 +69,7 @@ Citizen Hero includes a pluggable quest engine that can be upgraded from the bui
 
 ```text
 RAINDROP_API_URL=<your‑raindrop‑endpoint>
-RANDROP_API_KEY=<your‑secret‑api‑key>
+RAINDROP_API_KEY=<your‑secret‑api‑key>
 ```
 When both environment variables are present at runtime, the backend automatically sends your mission idea and clarifying details to Raindrop's SmartInference endpoint. Leaving these variables unset keeps all generation local and avoids any external API calls or billing. **Do not commit your API keys**.
 When both environment variables are present at runtime, the backend automatically sends your mission idea and clarifying details to Raindrop's SmartInference endpoint. The response is used to generate richer, more varied quests. Leaving these variables unset keeps all generation local and avoids any external API calls or billing. **Do not commit your API keys**.
