@@ -13,7 +13,9 @@ app = Flask(
     static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend")),
     static_url_path="/"
 )
-CORS(app)
+
+# Enable CORS with credential support so the frontend can send cookies when hosted on a different origin
+CORS(app, supports_credentials=True)
 
 # Initialize DB schema on startup (production will have DATABASE_URL set)
 if os.getenv("APP_ENV") == "production":
