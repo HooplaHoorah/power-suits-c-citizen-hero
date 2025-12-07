@@ -8,7 +8,7 @@ if defined _OLD_CODEPAGE (
     "%SystemRoot%\System32\chcp.com" 65001 > nul
 )
 
-set VIRTUAL_ENV=C:\dev\power-suits-c-citizen-hero\.venv
+set VIRTUAL_ENV=C:\dev\power-suits-c-citizen-hero_v8\power-suits-c-citizen-hero\.venv
 
 if not defined PROMPT set PROMPT=$P$G
 
