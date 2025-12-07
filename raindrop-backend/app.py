@@ -13,7 +13,9 @@ app = Flask(
     static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend")),
     static_url_path="/"
 )
-CORS(app)
+
+# Enable CORS with credential support so the frontend can send cookies when hosted on a different origin
+CORS(app, supports_credentials=True)
 
 # Initialize DB schema on startup (production will have DATABASE_URL set)
 if os.getenv("APP_ENV") == "production":
@@ -39,9 +41,28 @@ def clarify_mission_endpoint():
 
 def _get_session_id():
     """Retrieve a session identifier for persisting quests.
-    Uses a cookie if present, otherwise generates a UUID and sets it in the response.
+
+    Priority:
+    1. Explicit client_id (query string or JSON body) – stable per-browser.
+    2. session_id cookie (older behavior / local runs).
+    3. New random UUID.
     """
-    session_id = request.cookies.get('session_id')
+    # 1) Check query param
+    client_id = request.args.get("client_id")
+
+    # 2) If not in query, check JSON body (for POSTs like /generate-quest)
+    if not client_id:
+        try:
+            data = request.get_json(silent=True) or {}
+        except Exception:
+            data = {}
+        client_id = data.get("client_id")
+
+    if client_id:
+        return client_id
+
+    # 3) Fall back to cookie-based session id
+    session_id = request.cookies.get("session_id")
     if not session_id:
         session_id = str(uuid.uuid4())
     return session_id

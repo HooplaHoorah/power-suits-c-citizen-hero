@@ -2,6 +2,29 @@
 let currentMissionPayload = null;
 let currentQuestId = null;
 
+// Stable per-browser client id, used instead of fragile cross-site cookies
+const CLIENT_ID_STORAGE_KEY = 'psc_citizen_hero_client_id';
+
+function getOrCreateClientId() {
+  try {
+    const stored = window.localStorage.getItem(CLIENT_ID_STORAGE_KEY);
+    if (stored) return stored;
+    let newId;
+    if (window.crypto && window.crypto.randomUUID) {
+      newId = window.crypto.randomUUID();
+    } else {
+      newId = 'ch-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    }
+    window.localStorage.setItem(CLIENT_ID_STORAGE_KEY, newId);
+    return newId;
+  } catch (e) {
+    // Fallback if localStorage is unavailable
+    return 'ch-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  }
+}
+
+const CLIENT_ID = getOrCreateClientId();
+
 // Helper to reset the entire UI and state
 function resetAll() {
   // Reset form fields
@@ -43,6 +66,7 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
     help_mode: helpMode,
     nickname: nickname,
     age_range: ageRange,
+    client_id: CLIENT_ID,
   };
 
   try {
@@ -50,6 +74,8 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(currentMissionPayload),
+      // Include cookies for session management across origins
+      credentials: 'include',
     });
     if (!response.ok) throw new Error('Request failed');
     const data = await response.json();
@@ -116,6 +142,7 @@ async function generateQuest(payload) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      credentials: 'include',
     });
     if (!response.ok) throw new Error('Request failed');
     const data = await response.json();
@@ -202,30 +229,54 @@ function displayQuest(quest) {
 
 // View log button – shows all saved quests and cumulative SGXP
 document.getElementById('viewLogBtn').addEventListener('click', () => {
-  fetch(`${API_BASE_URL}/quests`)
+  const url = `${API_BASE_URL}/quests?client_id=${encodeURIComponent(CLIENT_ID)}`;
+  fetch(url, { credentials: 'include' })
     .then(res => res.json())
     .then(entries => {
       const logOutput = document.getElementById('log-output');
       logOutput.innerHTML = '';
       if (!Array.isArray(entries) || entries.length === 0) {
-        logOutput.textContent = 'No quests found.';
+        // Show friendly message when no quests exist
+        logOutput.textContent = 'No quests found. Complete a mission to populate your Suit Log!';
       } else {
+        // Compute cumulative SGXP across all saved quests
         let cumulativeSGXP = 0;
         entries.forEach(entry => {
           if (Array.isArray(entry.steps)) {
-            entry.steps.forEach(step => cumulativeSGXP += step.sgxp_reward || 0);
+            entry.steps.forEach(step => {
+              const reward = parseInt(step.sgxp_reward || 0, 10);
+              cumulativeSGXP += reward;
+            });
           }
         });
+        // Display the cumulative SGXP summary
         const totalPara = document.createElement('p');
         totalPara.innerHTML = `<strong>Total SGXP across quests:</strong> ${cumulativeSGXP}`;
         logOutput.appendChild(totalPara);
+        // Build a card for each quest
         entries.forEach(entry => {
-          const { id, quest_name, mission_summary } = entry;
+          const { id, quest_name, mission_summary, created_at } = entry;
+          // Calculate SGXP per quest
+          let questSGXP = 0;
+          if (Array.isArray(entry.steps)) {
+            entry.steps.forEach(step => {
+              questSGXP += parseInt(step.sgxp_reward || 0, 10);
+            });
+          }
           const card = document.createElement('div');
           card.className = 'quest-card';
-          card.innerHTML = `<h4>${quest_name}</h4><p>${mission_summary}</p>`;
+          // Format the creation timestamp for readability
+          const formattedDate = created_at ? new Date(created_at).toLocaleString() : '';
+          card.innerHTML = `
+            <h4>${quest_name}</h4>
+            <p>${mission_summary}</p>
+            <p><strong>Created:</strong> ${formattedDate}</p>
+            <p><strong>Quest SGXP:</strong> ${questSGXP}</p>
+          `;
+          // Clicking a card loads that quest’s details
           card.addEventListener('click', () => {
-            fetch(`${API_BASE_URL}/quests/${id}`)
+            const url = `${API_BASE_URL}/quests/${id}?client_id=${encodeURIComponent(CLIENT_ID)}`;
+            fetch(url, { credentials: 'include' })
               .then(r => r.json())
               .then(data => {
                 currentQuestId = data.id;
