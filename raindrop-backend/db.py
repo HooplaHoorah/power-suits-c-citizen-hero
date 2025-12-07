@@ -43,6 +43,20 @@ def insert_quest(session_id, quest_payload):
         return {"id": row[0], "created_at": row[1]}
 
 def list_quests(session_id, limit=20):
+    """
+    Retrieve a list of quest records for a given session, flattening the nested
+    quest_json field into the top-level dictionary.
+
+    Each quest returned from the database includes metadata (id, session_id,
+    created_at) and a JSON column `quest_json` containing the quest data.  The
+    frontend expects a single-level dictionary with keys like `quest_name`,
+    `steps` and `sgxp_reward` at the top level.  This helper merges the
+    nested JSON with the metadata so callers receive a flattened representation.
+
+    :param session_id: The user's session identifier (stored in cookie).
+    :param limit: Maximum number of quests to return, newest first.
+    :returns: A list of flattened quest dictionaries.
+    """
     with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(
             """
@@ -54,7 +68,18 @@ def list_quests(session_id, limit=20):
             """,
             (session_id, limit),
         )
-        return cur.fetchall()
+        rows = cur.fetchall()
+        quests = []
+        for row in rows:
+            # Start with the original quest JSON and merge in DB metadata.
+            quest_data = dict(row['quest_json']) if row.get('quest_json') else {}
+            quest_data.update({
+                'id': row['id'],
+                'session_id': row['session_id'],
+                'created_at': row['created_at'].isoformat() if hasattr(row['created_at'], 'isoformat') else row['created_at'],
+            })
+            quests.append(quest_data)
+        return quests
 
 def get_quest_by_id(quest_id):
     """Retrieve a single quest by its ID."""
