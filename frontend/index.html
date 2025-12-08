@@ -56,25 +56,61 @@
       margin-top: 4px;
     }
 
-	  .radio-group label {
-	  display: block;
-	  margin: 4px 0;
-	}
+    .radio-group label {
+      display: block;
+      margin: 4px 0;
+    }
 
-	.help-mode-option {
-	  display: flex;
-	  align-items: flex-start;
-	  gap: 0.5rem;
-	  margin: 4px 0;
-	}
-
-	.help-mode-option input[type="radio"] {
-	  margin-top: 0.2rem;
-	}
-
+    .help-mode-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      margin: 4px 0;
+    }
 
     .help-mode-option input[type="radio"] {
       margin-top: 0.2rem;
+    }
+
+    /* Layout for mission steps with SGXP badges */
+    .step-item {
+      margin-bottom: 0.75rem;
+    }
+
+    .quest-step-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    .quest-step-main {
+      flex: 1 1 auto;
+    }
+
+    .quest-step-main label {
+      flex: 1 1 auto;
+    }
+
+    /* Sort controls for Suit Logs */
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      margin-top: 20px;
+      margin-bottom: 10px;
+    }
+
+    .log-header h2 {
+      margin: 0;
+    }
+
+    .log-sort {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.9em;
     }
 
     button {
@@ -111,6 +147,7 @@
       padding: 2px 6px;
       font-size: 0.8em;
       margin-left: 4px;
+      white-space: nowrap;
     }
 
     .progress-container {
@@ -171,28 +208,25 @@
       <div class="form-group">
         <label>Help mode</label>
         <span class="hint">How would you like to help your cause?</span>
-		<label>Help mode</label>
-		<span class="hint">How would you like to help your cause?</span>
-		<div class="radio-group">
-		  <div class="help-mode-option">
-			<input checked name="helpMode" type="radio" id="helpModeSupplies" value="supplies" />
-			<label for="helpModeSupplies">
-			  Raise supplies – gather resources or donations.
-			</label>
-		  </div>
-		  <div class="help-mode-option">
-			<input name="helpMode" type="radio" id="helpModeAwareness" value="awareness" />
-			<label for="helpModeAwareness">
-			  Raise awareness – spread the word about the issue.
-			</label>
-		  </div>
-		  <div class="help-mode-option">
-			<input name="helpMode" type="radio" id="helpModeHelpers" value="helpers" />
-			<label for="helpModeHelpers">
-			  Organize helpers – rally people to join the mission.
-			</label>
-		  </div>
-		</div>
+        <div class="radio-group">
+          <div class="help-mode-option">
+            <input checked name="helpMode" type="radio" id="helpModeSupplies" value="supplies" />
+            <label for="helpModeSupplies">
+              Raise supplies – gather resources or donations.
+            </label>
+          </div>
+          <div class="help-mode-option">
+            <input name="helpMode" type="radio" id="helpModeAwareness" value="awareness" />
+            <label for="helpModeAwareness">
+              Raise awareness – spread the word about the issue.
+            </label>
+          </div>
+          <div class="help-mode-option">
+            <input name="helpMode" type="radio" id="helpModeHelpers" value="helpers" />
+            <label for="helpModeHelpers">
+              Organize helpers – rally people to join the mission.
+            </label>
+          </div>
         </div>
       </div>
       <p class="hint"><strong>Safety first:</strong> If you're under 18, enlist a trusted adult before taking on your
@@ -213,7 +247,18 @@
       <button id="viewLogBtn">View Suit Log</button>
     </section>
     <section id="log-section" style="display: none;">
-      <h2>Suit Logs</h2>
+      <div class="log-header">
+        <h2>Suit Logs</h2>
+        <div class="log-sort">
+          <label for="suitLogSort">Sort by:</label>
+          <select id="suitLogSort">
+            <option value="recent" selected>Most recent</option>
+            <option value="oldest">Oldest first</option>
+            <option value="quest-sgxp-high">Highest Quest SGXP</option>
+            <option value="quest-sgxp-low">Lowest Quest SGXP</option>
+          </select>
+        </div>
+      </div>
       <div id="log-output"></div>
       <button id="backBtn">Back to Mission</button>
     </section>
