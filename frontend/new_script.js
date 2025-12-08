@@ -1,6 +1,8 @@
 // Global variable to store mission payload during clarification
 let currentMissionPayload = null;
 let currentQuestId = null;
+let lastFetchedSuitLogEntries = [];
+let currentSuitLogSort = 'recent';
 
 // Stable per-browser client id, used instead of fragile cross-site cookies
 const CLIENT_ID_STORAGE_KEY = 'psc_citizen_hero_client_id';
@@ -231,8 +233,15 @@ function displayQuest(quest) {
       const li = document.createElement('li');
       li.className = 'step-item';
       li.innerHTML = `
-        <input type="checkbox" class="step-checkbox" id="step-${idx}" data-reward="${step.sgxp_reward}" />
-        <label for="step-${idx}"><strong>${step.title}</strong>: ${step.description} <span class="sgxp-badge">${step.sgxp_reward} SGXP</span></label>
+        <div class="quest-step-row">
+          <div class="quest-step-main">
+            <input type="checkbox" class="step-checkbox" id="step-${idx}" data-reward="${step.sgxp_reward}" />
+            <label for="step-${idx}">
+              ${step.title ? `<strong>${step.title}</strong>` : ''} ${step.description || ''}
+            </label>
+          </div>
+          <span class="sgxp-badge">${step.sgxp_reward} SGXP</span>
+        </div>
       `;
       stepList.appendChild(li);
     });
@@ -283,68 +292,14 @@ document.getElementById('viewLogBtn').addEventListener('click', () => {
   fetch(url)
     .then(res => res.json())
     .then(entries => {
-      const logOutput = document.getElementById('log-output');
-      logOutput.innerHTML = '';
-      if (!Array.isArray(entries) || entries.length === 0) {
-        // Show friendly message when no quests exist
-        logOutput.textContent = 'No quests found. Complete a mission to populate your Suit Log!';
+      lastFetchedSuitLogEntries = Array.isArray(entries) ? entries : [];
+      const sortSelect = document.getElementById('suitLogSort');
+      if (sortSelect) {
+        currentSuitLogSort = sortSelect.value || 'recent';
       } else {
-        // Compute cumulative SGXP across all saved quests
-        let cumulativeSGXP = 0;
-        entries.forEach(entry => {
-          const progress = loadQuestProgress(entry.id);
-          if (progress) {
-            cumulativeSGXP += parseInt(progress.earned || 0, 10);
-          } else if (Array.isArray(entry.steps)) {
-            entry.steps.forEach(step => {
-              cumulativeSGXP += parseInt(step.sgxp_reward || 0, 10);
-            });
-          }
-        });
-        // Display the cumulative SGXP summary
-        const totalPara = document.createElement('p');
-        totalPara.innerHTML = `<strong>Total SGXP across quests:</strong> ${cumulativeSGXP}`;
-        logOutput.appendChild(totalPara);
-        // Build a card for each quest
-        entries.forEach(entry => {
-          const { id, quest_name, mission_summary, created_at } = entry;
-          // Calculate total SGXP per quest
-          let questTotal = 0;
-          if (Array.isArray(entry.steps)) {
-            entry.steps.forEach(step => {
-              questTotal += parseInt(step.sgxp_reward || 0, 10);
-            });
-          }
-          const progress = loadQuestProgress(id);
-          const earned = progress ? parseInt(progress.earned || 0, 10) : questTotal;
-          const card = document.createElement('div');
-          card.className = 'quest-card';
-          // Format the creation timestamp for readability
-          const formattedDate = created_at ? new Date(created_at).toLocaleString() : '';
-          card.innerHTML = `
-            <h4>${quest_name}</h4>
-            <p>${mission_summary}</p>
-            <p><strong>Created:</strong> ${formattedDate}</p>
-            <p><strong>Quest SGXP:</strong> ${earned} / ${questTotal}</p>
-          `;
-          // Clicking a card loads that quest’s details
-          card.addEventListener('click', () => {
-            const detailUrl = `${API_BASE_URL}/quests/${id}?client_id=${encodeURIComponent(CLIENT_ID)}`;
-            fetch(detailUrl)
-              .then(r => r.json())
-              .then(data => {
-                currentQuestId = data.id;
-                displayQuest(data);
-                document.getElementById('log-section').style.display = 'none';
-              })
-              .catch(err => {
-                console.error('Error fetching quest details:', err);
-                alert('Failed to load the quest. Please try again.');
-              });
-          });
-          logOutput.appendChild(card);
-        });
+        currentSuitLogSort = 'recent';
       }
+      renderSuitLogEntries(lastFetchedSuitLogEntries, currentSuitLogSort);
       document.getElementById('quest-section').style.display = 'none';
       document.getElementById('log-section').style.display = 'block';
     })
@@ -354,6 +309,101 @@ document.getElementById('viewLogBtn').addEventListener('click', () => {
     });
 });
 
+
+
+function renderSuitLogEntries(entries, sortMode = 'recent') {
+  const logOutput = document.getElementById('log-output');
+  if (!logOutput) return;
+  logOutput.innerHTML = '';
+
+  if (!Array.isArray(entries) || entries.length === 0) {
+    logOutput.textContent = 'No quests found. Complete a mission to populate your Suit Log!';
+    return;
+  }
+
+  // Load local progress
+  const raw = localStorage.getItem('psc_citizen_hero_progress');
+  const progressMap = raw ? JSON.parse(raw) : {};
+
+  const questsWithStats = entries.map(entry => {
+    const steps = Array.isArray(entry.steps) ? entry.steps : [];
+    const questTotal = steps.reduce((sum, s) => sum + parseInt(s.sgxp_reward || 0, 10), 0);
+
+    const saved = progressMap[entry.id];
+    let earned = questTotal;
+    if (saved && typeof saved.earned === 'number') {
+      earned = saved.earned;
+    } else if (saved && saved.stepStatus) {
+      earned = steps.reduce((sum, s, idx) => {
+        return sum + (saved.stepStatus[idx] ? parseInt(s.sgxp_reward || 0, 10) : 0);
+      }, 0);
+    }
+
+    return {
+      ...entry,
+      questTotal,
+      earned,
+      createdAt: entry.created_at || entry.createdAt || entry.created || null
+    };
+  });
+
+  // Sorting
+  const sorted = [...questsWithStats];
+  if (sortMode === 'oldest') {
+    sorted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  } else if (sortMode === 'quest-sgxp-high') {
+    sorted.sort((a, b) => b.earned - a.earned);
+  } else if (sortMode === 'quest-sgxp-low') {
+    sorted.sort((a, b) => a.earned - b.earned);
+  } else {
+    // most recent
+    sorted.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+
+  const totalAcross = questsWithStats.reduce((sum, q) => sum + q.earned, 0);
+  const totalPara = document.createElement('p');
+  totalPara.innerHTML = `<strong>Total SGXP across quests:</strong> ${totalAcross}`;
+  logOutput.appendChild(totalPara);
+
+  sorted.forEach(entry => {
+    const { id, quest_name, mission_summary, questTotal, earned } = entry;
+    const createdText = entry.createdAt ? new Date(entry.createdAt).toLocaleString() : '';
+    const card = document.createElement('div');
+    card.className = 'quest-card';
+    card.innerHTML = `
+      <h4>${quest_name}</h4>
+      <p>${mission_summary}</p>
+      <p><strong>Created:</strong> ${createdText}</p>
+      <p><strong>Quest SGXP:</strong> ${earned} / ${questTotal}</p>
+    `;
+    card.addEventListener('click', () => {
+      const detailUrl = `${API_BASE_URL}/quests/${id}?client_id=${encodeURIComponent(CLIENT_ID)}`;
+      fetch(detailUrl)
+        .then(r => r.json())
+        .then(data => {
+          currentQuestId = data.id;
+          displayQuest(data);
+          document.getElementById('log-section').style.display = 'none';
+        })
+        .catch(err => {
+          console.error('Error fetching quest details:', err);
+          alert('Failed to load the quest. Please try again.');
+        });
+    });
+    logOutput.appendChild(card);
+  });
+}
+
+// Listen for sort changes on Suit Logs
+document.addEventListener('DOMContentLoaded', () => {
+  const sortSelect = document.getElementById('suitLogSort');
+  if (sortSelect) {
+    sortSelect.addEventListener('change', (e) => {
+      currentSuitLogSort = e.target.value || 'recent';
+      renderSuitLogEntries(lastFetchedSuitLogEntries, currentSuitLogSort);
+    });
+  }
+});
 // Back button from log view
 document.getElementById('backBtn').addEventListener('click', () => {
   document.getElementById('log-section').style.display = 'none';
