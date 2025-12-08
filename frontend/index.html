@@ -56,17 +56,22 @@
       margin-top: 4px;
     }
 
-    .radio-group label {
-      display: block;
-      margin: 4px 0;
-    }
+	  .radio-group label {
+	  display: block;
+	  margin: 4px 0;
+	}
 
-    .help-mode-option {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.5rem;
-      margin: 4px 0;
-    }
+	.help-mode-option {
+	  display: flex;
+	  align-items: flex-start;
+	  gap: 0.5rem;
+	  margin: 4px 0;
+	}
+
+	.help-mode-option input[type="radio"] {
+	  margin-top: 0.2rem;
+	}
+
 
     .help-mode-option input[type="radio"] {
       margin-top: 0.2rem;
@@ -166,19 +171,28 @@
       <div class="form-group">
         <label>Help mode</label>
         <span class="hint">How would you like to help your cause?</span>
-        <div class="radio-group">
-          <div class="help-mode-option">
-            <input checked name="helpMode" type="radio" id="helpModeSupplies" value="supplies" />
-            <label for="helpModeSupplies">Raise supplies – gather resources or donations.</label>
-          </div>
-          <div class="help-mode-option">
-            <input name="helpMode" type="radio" id="helpModeAwareness" value="awareness" />
-            <label for="helpModeAwareness">Raise awareness – spread the word about the issue.</label>
-          </div>
-          <div class="help-mode-option">
-            <input name="helpMode" type="radio" id="helpModeHelpers" value="helpers" />
-            <label for="helpModeHelpers">Organize helpers – rally people to join the mission.</label>
-          </div>
+		<label>Help mode</label>
+		<span class="hint">How would you like to help your cause?</span>
+		<div class="radio-group">
+		  <div class="help-mode-option">
+			<input checked name="helpMode" type="radio" id="helpModeSupplies" value="supplies" />
+			<label for="helpModeSupplies">
+			  Raise supplies – gather resources or donations.
+			</label>
+		  </div>
+		  <div class="help-mode-option">
+			<input name="helpMode" type="radio" id="helpModeAwareness" value="awareness" />
+			<label for="helpModeAwareness">
+			  Raise awareness – spread the word about the issue.
+			</label>
+		  </div>
+		  <div class="help-mode-option">
+			<input name="helpMode" type="radio" id="helpModeHelpers" value="helpers" />
+			<label for="helpModeHelpers">
+			  Organize helpers – rally people to join the mission.
+			</label>
+		  </div>
+		</div>
         </div>
       </div>
       <p class="hint"><strong>Safety first:</strong> If you're under 18, enlist a trusted adult before taking on your
