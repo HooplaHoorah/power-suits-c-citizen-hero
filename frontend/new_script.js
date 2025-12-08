@@ -25,6 +25,40 @@ function getOrCreateClientId() {
 
 const CLIENT_ID = getOrCreateClientId();
 
+// Storage key and helpers for persisting quest progress per quest id.
+const PROGRESS_STORAGE_KEY = 'psc_citizen_hero_progress';
+
+/**
+ * Load saved progress for a quest by its id. Returns
+ * an object of shape { earned: number, stepStatus: { [idx]: boolean } }
+ * or null when no progress is saved.
+ */
+function loadQuestProgress(id) {
+  try {
+    const raw = window.localStorage.getItem(PROGRESS_STORAGE_KEY);
+    if (!raw) return null;
+    const all = JSON.parse(raw);
+    return all[id] || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Save progress for a quest. The progress object should have
+ * shape { earned: number, stepStatus: { [idx]: boolean } }.
+ */
+function saveQuestProgress(id, progress) {
+  try {
+    const raw = window.localStorage.getItem(PROGRESS_STORAGE_KEY);
+    const all = raw ? JSON.parse(raw) : {};
+    all[id] = progress;
+    window.localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(all));
+  } catch (e) {
+    // Ignore storage errors
+  }
+}
+
 // Helper to reset the entire UI and state
 function resetAll() {
   // Reset form fields
@@ -73,9 +107,7 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
     const response = await fetch(`${API_BASE_URL}/clarify-mission`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(currentMissionPayload),
-      // Include cookies for session management across origins
-      credentials: 'include',
+      body: JSON.stringify(currentMissionPayload)
     });
     if (!response.ok) throw new Error('Request failed');
     const data = await response.json();
@@ -141,8 +173,7 @@ async function generateQuest(payload) {
     const response = await fetch(`${API_BASE_URL}/generate-quest`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      credentials: 'include',
+      body: JSON.stringify(payload)
     });
     if (!response.ok) throw new Error('Request failed');
     const data = await response.json();
@@ -168,6 +199,9 @@ function displayQuest(quest) {
   output.innerHTML = '';
   const questContainer = document.createElement('div');
   questContainer.className = 'quest-card';
+
+  // Record current quest id for persistence
+  currentQuestId = quest.id;
 
   const totalSGXP = Array.isArray(quest.steps)
     ? quest.steps.reduce((acc, step) => acc + (step.sgxp_reward || 0), 0)
@@ -208,17 +242,33 @@ function displayQuest(quest) {
   const progressBar = questContainer.querySelector('.progress-bar');
   const checkboxes = questContainer.querySelectorAll('.step-checkbox');
   const sgxpEarnedEl = questContainer.querySelector('.sgxp-earned');
+
+  // Load previously saved progress for this quest
+  const saved = loadQuestProgress(currentQuestId) || { earned: 0, stepStatus: {} };
+  // Restore checkbox states
+  checkboxes.forEach((cb, index) => {
+    if (saved.stepStatus && saved.stepStatus[index]) {
+      cb.checked = true;
+    }
+  });
+
   function updateProgress() {
     let gained = 0;
-    checkboxes.forEach(cb => {
-      if (cb.checked) gained += parseInt(cb.dataset.reward || '0', 10);
+    const stepStatus = {};
+    checkboxes.forEach((cb, index) => {
+      if (cb.checked) {
+        gained += parseInt(cb.dataset.reward || '0', 10);
+      }
+      stepStatus[index] = cb.checked;
     });
     const ratio = totalSGXP > 0 ? (gained / totalSGXP) * 100 : 0;
     progressBar.style.width = ratio + '%';
     if (sgxpEarnedEl) sgxpEarnedEl.textContent = gained;
+    // Persist progress
+    saveQuestProgress(currentQuestId, { earned: gained, stepStatus });
   }
   checkboxes.forEach(cb => cb.addEventListener('change', updateProgress));
-  // Initialise progress
+  // Initialise progress with saved values
   updateProgress();
 
   output.appendChild(questContainer);
@@ -230,7 +280,7 @@ function displayQuest(quest) {
 // View log button – shows all saved quests and cumulative SGXP
 document.getElementById('viewLogBtn').addEventListener('click', () => {
   const url = `${API_BASE_URL}/quests?client_id=${encodeURIComponent(CLIENT_ID)}`;
-  fetch(url, { credentials: 'include' })
+  fetch(url)
     .then(res => res.json())
     .then(entries => {
       const logOutput = document.getElementById('log-output');
@@ -242,10 +292,12 @@ document.getElementById('viewLogBtn').addEventListener('click', () => {
         // Compute cumulative SGXP across all saved quests
         let cumulativeSGXP = 0;
         entries.forEach(entry => {
-          if (Array.isArray(entry.steps)) {
+          const progress = loadQuestProgress(entry.id);
+          if (progress) {
+            cumulativeSGXP += parseInt(progress.earned || 0, 10);
+          } else if (Array.isArray(entry.steps)) {
             entry.steps.forEach(step => {
-              const reward = parseInt(step.sgxp_reward || 0, 10);
-              cumulativeSGXP += reward;
+              cumulativeSGXP += parseInt(step.sgxp_reward || 0, 10);
             });
           }
         });
@@ -256,13 +308,15 @@ document.getElementById('viewLogBtn').addEventListener('click', () => {
         // Build a card for each quest
         entries.forEach(entry => {
           const { id, quest_name, mission_summary, created_at } = entry;
-          // Calculate SGXP per quest
-          let questSGXP = 0;
+          // Calculate total SGXP per quest
+          let questTotal = 0;
           if (Array.isArray(entry.steps)) {
             entry.steps.forEach(step => {
-              questSGXP += parseInt(step.sgxp_reward || 0, 10);
+              questTotal += parseInt(step.sgxp_reward || 0, 10);
             });
           }
+          const progress = loadQuestProgress(id);
+          const earned = progress ? parseInt(progress.earned || 0, 10) : questTotal;
           const card = document.createElement('div');
           card.className = 'quest-card';
           // Format the creation timestamp for readability
@@ -271,12 +325,12 @@ document.getElementById('viewLogBtn').addEventListener('click', () => {
             <h4>${quest_name}</h4>
             <p>${mission_summary}</p>
             <p><strong>Created:</strong> ${formattedDate}</p>
-            <p><strong>Quest SGXP:</strong> ${questSGXP}</p>
+            <p><strong>Quest SGXP:</strong> ${earned} / ${questTotal}</p>
           `;
           // Clicking a card loads that quest’s details
           card.addEventListener('click', () => {
-            const url = `${API_BASE_URL}/quests/${id}?client_id=${encodeURIComponent(CLIENT_ID)}`;
-            fetch(url, { credentials: 'include' })
+            const detailUrl = `${API_BASE_URL}/quests/${id}?client_id=${encodeURIComponent(CLIENT_ID)}`;
+            fetch(detailUrl)
               .then(r => r.json())
               .then(data => {
                 currentQuestId = data.id;
