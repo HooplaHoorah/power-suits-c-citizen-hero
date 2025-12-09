@@ -39,7 +39,8 @@
       margin-bottom: 5px;
     }
 
-    .form-group input,
+    /* Generic form control styling – make ONLY text inputs full-width */
+    .form-group input[type="text"],
     .form-group select,
     .form-group textarea {
       width: 100%;
@@ -47,6 +48,34 @@
       border: 1px solid #ccc;
       border-radius: 4px;
       box-sizing: border-box;
+    }
+
+    /* Help mode radio layout */
+    .radio-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      /* vertical space between options */
+      margin-top: 4px;
+    }
+
+    .help-mode-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      margin: 0;
+      /* gap handles the spacing */
+    }
+
+    .help-mode-option input[type="radio"] {
+      margin-top: 0.2rem;
+      /* aligns dot with first line of text */
+      width: auto;
+      flex: 0 0 auto;
+    }
+
+    .help-mode-option label {
+      flex: 1 1 auto;
     }
 
     .hint {
@@ -212,21 +241,24 @@
       <div class="form-group">
         <label>Help mode</label>
         <span class="hint">How would you like to help your cause?</span>
+
         <div class="radio-group">
           <div class="help-mode-option">
-            <input checked name="helpMode" type="radio" id="helpModeSupplies" value="supplies" />
+            <input type="radio" name="helpMode" id="helpModeSupplies" value="supplies" checked />
             <label for="helpModeSupplies">
               Raise supplies – gather resources or donations.
             </label>
           </div>
+
           <div class="help-mode-option">
-            <input name="helpMode" type="radio" id="helpModeAwareness" value="awareness" />
+            <input type="radio" name="helpMode" id="helpModeAwareness" value="awareness" />
             <label for="helpModeAwareness">
               Raise awareness – spread the word about the issue.
             </label>
           </div>
+
           <div class="help-mode-option">
-            <input name="helpMode" type="radio" id="helpModeHelpers" value="helpers" />
+            <input type="radio" name="helpMode" id="helpModeHelpers" value="helpers" />
             <label for="helpModeHelpers">
               Organize helpers – rally people to join the mission.
             </label>
