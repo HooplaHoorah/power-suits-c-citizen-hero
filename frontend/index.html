@@ -56,9 +56,13 @@
       margin-top: 4px;
     }
 
-    .radio-group label {
-      display: block;
-      margin: 4px 0;
+    /* Removed default block display for radio group labels to allow inline layout with help mode options */
+    /* Additional specific styling for help-mode labels */
+    .help-mode-option label {
+      /* Let label flex within row and wrap naturally */
+      flex: 1 1 auto;
+      display: inline-block;
+      margin: 0;
     }
 
     .help-mode-option {
