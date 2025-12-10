@@ -156,7 +156,7 @@ def delete_all_quests_endpoint():
 
 
 # Serve the frontend entry point
-@app.route("/", methods=["GET"]) 
+@app.route("/", methods=["GET"])
 def serve_frontend():
     return send_from_directory(app.static_folder, "index.html")
 

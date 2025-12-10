@@ -1,623 +1,770 @@
-// Added from remote repository; this file contains the full
-// Citizen Hero frontend logic. Updated in v14 to fix deletion
-// error handling and add a dynamic top back button with SGXP
-// legend. This version is based on the upstream new_script.js.
+// frontend/new_script.js
+// Main UI + API glue for Power Suits C™: Citizen Hero™
+// Handles: clarifying flow, quest rendering, SGXP mission bar, Suit Log, and
+// optimistic delete / clear behavior wired to the Flask backend.
 
-// Global variable to store mission payload during clarification
-let currentMissionPayload = null;
-let currentQuestId = null;
-let lastFetchedSuitLogEntries = [];
-let currentSuitLogSort = 'recent';
+(function () {
+  "use strict";
 
-// Stable per-browser client id, used instead of fragile cross-site cookies
-const CLIENT_ID_STORAGE_KEY = 'psc_citizen_hero_client_id';
+  const API_BASE_URL = (typeof window !== "undefined" && window.API_BASE_URL) || "";
 
-function getOrCreateClientId() {
-  try {
-    const stored = window.localStorage.getItem(CLIENT_ID_STORAGE_KEY);
-    if (stored) return stored;
-    let newId;
-    if (window.crypto && window.crypto.randomUUID) {
-      newId = window.crypto.randomUUID();
-    } else {
-      newId = 'ch-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
-    }
-    window.localStorage.setItem(CLIENT_ID_STORAGE_KEY, newId);
-    return newId;
-  } catch (e) {
-    // Fallback if localStorage is unavailable
-    return 'ch-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
-  }
-}
+  // ----- DOM LOOKUPS -------------------------------------------------------
+  const formSection = document.getElementById("form-section");
+  const clarifySection = document.getElementById("clarify-section");
+  const questSection = document.getElementById("quest-section");
+  const logSection = document.getElementById("log-section");
 
-const CLIENT_ID = getOrCreateClientId();
+  const generateBtn = document.getElementById("generateBtn");
+  const confirmMissionBtn = document.getElementById("confirmMissionBtn");
 
-// Storage key and helpers for persisting quest progress per quest id.
-const PROGRESS_STORAGE_KEY = 'psc_citizen_hero_progress';
+  const questionsContainer = document.getElementById("questions-container");
+  const questOutput = document.getElementById("quest-output");
 
-/**
- * Load saved progress for a quest by its id. Returns
- * an object of shape { earned: number, stepStatus: { [idx]: boolean } }
- * or null when no progress is saved.
- */
-function loadQuestProgress(id) {
-  try {
-    const raw = window.localStorage.getItem(PROGRESS_STORAGE_KEY);
-    if (!raw) return null;
-    const all = JSON.parse(raw);
-    return all[id] || null;
-  } catch (e) {
-    return null;
-  }
-}
+  const newQuestBtn = document.getElementById("newQuestBtn");
+  const viewLogBtn = document.getElementById("viewLogBtn");
 
-/**
- * Save progress for a quest. The progress object should have
- * shape { earned: number, stepStatus: { [idx]: boolean } }.
- */
-function saveQuestProgress(id, progress) {
-  try {
-    const raw = window.localStorage.getItem(PROGRESS_STORAGE_KEY);
-    const all = raw ? JSON.parse(raw) : {};
-    all[id] = progress;
-    window.localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(all));
-  } catch (e) {
-    // Ignore storage errors
-  }
-}
+  const suitLogSortSelect = document.getElementById("suitLogSort");
+  const deleteAllQuestsBtn = document.getElementById("deleteAllQuestsBtn");
+  const backBtnTop = document.getElementById("backBtnTop");
+  const backBtn = document.getElementById("backBtn");
+  const logOutput = document.getElementById("log-output");
 
-// Helper to reset the entire UI and state
-function resetAll() {
-  // Reset form fields
-  const nicknameInput = document.getElementById('nickname');
-  if (nicknameInput) nicknameInput.value = '';
-  const ageSelect = document.getElementById('ageRange');
-  if (ageSelect) ageSelect.selectedIndex = 0;
-  const missionTextarea = document.getElementById('missionIdea');
-  if (missionTextarea) missionTextarea.value = '';
-  // Reset help mode to default ("supplies")
-  const defaultHelpRadio = document.querySelector('input[name="helpMode"][value="supplies"]');
-  if (defaultHelpRadio) defaultHelpRadio.checked = true;
-  // Clear clarifying answers
-  document.querySelectorAll('.clarify-answer').forEach(input => {
-    input.value = '';
-  });
-  // Clear questions container
-  const questionsContainer = document.getElementById('questions-container');
-  if (questionsContainer) questionsContainer.innerHTML = '';
-  // Reset internal state
-  currentMissionPayload = null;
-  currentQuestId = null;
-  // Hide all sections and show fresh form
-  document.getElementById('quest-section').style.display = 'none';
-  document.getElementById('clarify-section').style.display = 'none';
-  document.getElementById('log-section').style.display = 'none';
-  document.getElementById('form-section').style.display = 'block';
-}
+  const nicknameInput = document.getElementById("nickname");
+  const ageRangeSelect = document.getElementById("ageRange");
+  const missionIdeaInput = document.getElementById("missionIdea");
 
-// Event listener for generating a new quest (starts clarification)
-document.getElementById('generateBtn').addEventListener('click', async () => {
-  const nickname = document.getElementById('nickname').value;
-  const ageRange = document.getElementById('ageRange').value;
-  const missionIdea = document.getElementById('missionIdea').value;
-  const helpModeElement = document.querySelector('input[name="helpMode"]:checked');
-  const helpMode = helpModeElement ? helpModeElement.value : '';
-
-  // Build payload
-  currentMissionPayload = {
-    mission_idea: missionIdea,
-    help_mode: helpMode,
-    nickname: nickname,
-    age_range: ageRange,
-    client_id: CLIENT_ID,
+  // ----- STATE -------------------------------------------------------------
+  const state = {
+    basePayload: null,
+    clarifyQuestions: [],
+    currentQuest: null,
+    suitLog: [],
+    sortMode: "recent",
+    clientId: getOrCreateClientId()
   };
 
-  try {
-    const response = await fetch(`${API_BASE_URL}/clarify-mission`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(currentMissionPayload)
-    });
-    if (!response.ok) throw new Error('Request failed');
-    const data = await response.json();
-    if (data.questions && data.questions.length > 0) {
-      displayClarifyingQuestions(data.questions);
-    } else {
-      // If no clarifying questions are returned, jump straight to quest generation
-      generateQuest(currentMissionPayload);
-    }
-  } catch (err) {
-    console.error(err);
-    alert('Error starting mission. Please try again.');
-  }
-});
-
-// Display clarifying questions with helpful hints
-function displayClarifyingQuestions(questions) {
-  const container = document.getElementById('questions-container');
-  container.innerHTML = '';
-  const hints = [
-    {
-      description: 'Describe the person, group, or organization you want to help.',
-      example: 'Example: "Cats and dogs at the Pine Street Animal Shelter."',
-    },
-    {
-      description: 'Give a rough time frame so JayNova can size your quest.',
-      example: 'Example: "Within the next two weeks."',
-    },
-    {
-      description: 'List one to three key items you want to collect or provide.',
-      example: 'Example: "Blankets, canned pet food, and kitty litter."',
-    },
-  ];
-  questions.forEach((q, idx) => {
-    const div = document.createElement('div');
-    div.className = 'form-group';
-    const hint = hints[idx] || {};
-    const hintHtml = hint.description
-      ? `<span class="hint">${hint.description}<br><em>${hint.example || ''}</em></span>`
-      : '';
-    div.innerHTML = `
-      <label>${q}</label>
-      ${hintHtml}
-      <input type="text" class="clarify-answer" data-idx="${idx}">
-    `;
-    container.appendChild(div);
-  });
-  document.getElementById('form-section').style.display = 'none';
-  document.getElementById('clarify-section').style.display = 'block';
-}
-
-// Confirm clarifying answers and generate quest
-document.getElementById('confirmMissionBtn').addEventListener('click', () => {
-  const inputs = document.querySelectorAll('.clarify-answer');
-  const answers = [];
-  inputs.forEach(input => answers.push(input.value));
-  if (!currentMissionPayload) {
-    currentMissionPayload = {};
-  }
-  currentMissionPayload.clarifying_answers = answers;
-  generateQuest(currentMissionPayload);
-});
-
-// Generate quest from backend
-async function generateQuest(payload) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/generate-quest`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (!response.ok) throw new Error('Request failed');
-    const data = await response.json();
-    currentQuestId = data.id;
-    document.getElementById('clarify-section').style.display = 'none';
-    document.getElementById('form-section').style.display = 'none';
-    displayQuest(data);
-  } catch (err) {
-    console.error(err);
-    alert('Error generating quest. Please try again.');
-    // Show form again on error
-    document.getElementById('form-section').style.display = 'block';
-    document.getElementById('clarify-section').style.display = 'none';
-  }
-}
-
-// New quest button – full reset
-document.getElementById('newQuestBtn').addEventListener('click', resetAll);
-
-// Helper to apply 6-color band classes to mission progress bar
-function applyProgressBandClass(barEl, percent) {
-  if (!barEl) return;
-  const classes = ['progress-band-0', 'progress-band-20', 'progress-band-40', 'progress-band-60', 'progress-band-80', 'progress-band-100'];
-  classes.forEach(c => barEl.classList.remove(c));
-  let cls;
-  if (percent >= 99.5) {
-    cls = 'progress-band-100';
-  } else if (percent >= 80) {
-    cls = 'progress-band-80';
-  } else if (percent >= 60) {
-    cls = 'progress-band-60';
-  } else if (percent >= 40) {
-    cls = 'progress-band-40';
-  } else if (percent >= 20) {
-    cls = 'progress-band-20';
-  } else {
-    cls = 'progress-band-0';
-  }
-  barEl.classList.add(cls);
-}
-
-// Display quest details with SGXP progress and interactive steps
-function displayQuest(quest) {
-  const output = document.getElementById('quest-output');
-  output.innerHTML = '';
-  const questContainer = document.createElement('div');
-  questContainer.className = 'quest-card';
-
-  // Record current quest id for persistence
-  currentQuestId = quest.id;
-
-  const totalSGXP = Array.isArray(quest.steps)
-    ? quest.steps.reduce((acc, step) => acc + (step.sgxp_reward || 0), 0)
-    : 0;
-
-  questContainer.innerHTML = `
-    <h3>${quest.quest_name}</h3>
-    <div class="progress-container"><div class="progress-bar progress-band-0" style="width:0%"></div></div>
-    <p>${quest.mission_summary}</p>
-    <h4>Steps</h4>
-    <ol class="step-list"></ol>
-    <h4>Reflection Prompts</h4>
-    <ul class="reflection-list">${
-      Array.isArray(quest.reflection_prompts)
-        ? quest.reflection_prompts.map(p => `<li>${p}</li>`).join('')
-        : ''
-    }</ul>
-    <h4>Safety Notes</h4>
-    <ul class="safety-list">${
-      Array.isArray(quest.safety_notes)
-        ? quest.safety_notes.map(n => `<li>${n}</li>`).join('')
-        : ''
-    }</ul>
-    <p><strong>Total SGXP:</strong> <span class="sgxp-earned">0</span> / ${totalSGXP}</p>
-  `;
-
-  // Populate steps with checkboxes
-  const stepList = questContainer.querySelector('.step-list');
-  if (Array.isArray(quest.steps)) {
-    quest.steps.forEach((step, idx) => {
-      const li = document.createElement('li');
-      li.className = 'step-item';
-      li.innerHTML = `
-        <div class="quest-step-row">
-          <div class="quest-step-main">
-            <input type="checkbox" class="step-checkbox" id="step-${idx}" data-reward="${step.sgxp_reward}" />
-            <label for="step-${idx}">
-              ${step.title ? `<strong>${step.title}</strong>` : ''} ${step.description || ''}
-            </label>
-          </div>
-          <span class="sgxp-badge">${step.sgxp_reward} SGXP</span>
-        </div>
-      `;
-      stepList.appendChild(li);
-    });
-  }
-
-  // Progress logic
-  const progressBar = questContainer.querySelector('.progress-bar');
-  const checkboxes = questContainer.querySelectorAll('.step-checkbox');
-  const sgxpEarnedEl = questContainer.querySelector('.sgxp-earned');
-
-  // Load previously saved progress for this quest
-  const saved = loadQuestProgress(currentQuestId) || { earned: 0, stepStatus: {} };
-  // Restore checkbox states
-  checkboxes.forEach((cb, index) => {
-    if (saved.stepStatus && saved.stepStatus[index]) {
-      cb.checked = true;
-    }
-  });
-
-  function updateProgress() {
-    let gained = 0;
-    const stepStatus = {};
-    checkboxes.forEach((cb, index) => {
-      const li = cb.closest('.step-item');
-      if (cb.checked) {
-        gained += parseInt(cb.dataset.reward || '0', 10);
-        if (li) li.classList.add('step-completed');
-      } else if (li) {
-        li.classList.remove('step-completed');
+  function getOrCreateClientId() {
+    try {
+      const key = "psc_client_id_v1";
+      let id = window.localStorage.getItem(key);
+      if (!id) {
+        id = "psc-" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        window.localStorage.setItem(key, id);
       }
-      stepStatus[index] = cb.checked;
-    });
-    const ratio = totalSGXP > 0 ? (gained / totalSGXP) * 100 : 0;
-    if (progressBar) {
-      progressBar.style.width = `${ratio}%`;
-      applyProgressBandClass(progressBar, ratio);
+      return id;
+    } catch (err) {
+      console.warn("ClientId localStorage unavailable:", err);
+      return null;
     }
-    if (sgxpEarnedEl) sgxpEarnedEl.textContent = gained;
-    // Persist progress
-    saveQuestProgress(currentQuestId, { earned: gained, stepStatus });
-  }
-  checkboxes.forEach(cb => cb.addEventListener('change', updateProgress));
-  // Initialise progress with saved values
-  updateProgress();
-
-  output.appendChild(questContainer);
-  // Show quest section
-  document.getElementById('form-section').style.display = 'none';
-  document.getElementById('quest-section').style.display = 'block';
-}
-
-// View log button – shows all saved quests and cumulative SGXP
-document.getElementById('viewLogBtn').addEventListener('click', () => {
-  const url = `${API_BASE_URL}/quests?client_id=${encodeURIComponent(CLIENT_ID)}`;
-  fetch(url)
-    .then(res => res.json())
-    .then(entries => {
-      lastFetchedSuitLogEntries = Array.isArray(entries) ? entries : [];
-      const sortSelect = document.getElementById('suitLogSort');
-      if (sortSelect) {
-        currentSuitLogSort = sortSelect.value || 'recent';
-      } else {
-        currentSuitLogSort = 'recent';
-      }
-      renderSuitLogEntries(lastFetchedSuitLogEntries, currentSuitLogSort);
-      document.getElementById('quest-section').style.display = 'none';
-      document.getElementById('log-section').style.display = 'block';
-      // Update top back button visibility on initial render
-      checkBackBtnVisibility();
-    })
-    .catch(err => {
-      console.error('Error fetching quests:', err);
-      alert('Failed to load your quest log. Please try again.');
-    });
-});
-
-// Render Suit Log entries with sorting and local SGXP progress
-function renderSuitLogEntries(entries, sortMode = 'recent') {
-  const logOutput = document.getElementById('log-output');
-  if (!logOutput) return;
-  logOutput.innerHTML = '';
-
-  if (!Array.isArray(entries) || entries.length === 0) {
-    logOutput.textContent = 'No quests found. Complete a mission to populate your Suit Log!';
-    // Ensure top back button is hidden when no entries
-    checkBackBtnVisibility();
-    return;
   }
 
-  // Load local progress
-  const raw = localStorage.getItem(PROGRESS_STORAGE_KEY);
-  const progressMap = raw ? JSON.parse(raw) : {};
+  // ----- SECTION TOGGLING --------------------------------------------------
+  function showSection(section) {
+    formSection.style.display = section === "form" ? "" : "none";
+    clarifySection.style.display = section === "clarify" ? "" : "none";
+    questSection.style.display = section === "quest" ? "" : "none";
+    logSection.style.display = section === "log" ? "" : "none";
 
-  const questsWithStats = entries.map(entry => {
-    const steps = Array.isArray(entry.steps) ? entry.steps : [];
-    const questTotal = steps.reduce((sum, s) => sum + parseInt(s.sgxp_reward || 0, 10), 0);
+    if (section !== "log") {
+      backBtnTop.style.display = "none";
+    }
+  }
 
-    const saved = progressMap[entry.id];
-    let earned = 0;
-    if (saved && typeof saved.earned === 'number') {
-      earned = saved.earned;
-    } else if (saved && saved.stepStatus) {
-      earned = steps.reduce((sum, s, idx) => {
-        return sum + (saved.stepStatus[idx] ? parseInt(s.sgxp_reward || 0, 10) : 0);
-      }, 0);
+  // ----- HELPERS -----------------------------------------------------------
+  function getSelectedHelpMode() {
+    const radios = document.querySelectorAll("input[name='helpMode']");
+    for (const r of radios) {
+      if (r.checked) return r.value;
+    }
+    return "supplies";
+  }
+
+  function buildBasePayload() {
+    const missionIdea = (missionIdeaInput.value || "").trim();
+    if (!missionIdea) {
+      alert("Tell Suit OS JayNova what's bugging you in your world first.");
+      missionIdeaInput.focus();
+      return null;
     }
 
-    return {
-      ...entry,
-      questTotal,
-      earned,
-      createdAt: entry.created_at || entry.createdAt || entry.created || null
+    const payload = {
+      mission_idea: missionIdea,
+      help_mode: getSelectedHelpMode(),
+      nickname: (nicknameInput.value || "").trim(),
+      age_range: ageRangeSelect.value,
     };
-  });
 
-  // Sorting
-  const sorted = [...questsWithStats];
-  if (sortMode === 'oldest') {
-    sorted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-  } else if (sortMode === 'quest-sgxp-high') {
-    sorted.sort((a, b) => b.earned - a.earned);
-  } else if (sortMode === 'quest-sgxp-low') {
-    sorted.sort((a, b) => a.earned - b.earned);
-  } else {
-    // most recent
-    sorted.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    if (state.clientId) {
+      payload.client_id = state.clientId;
+    }
+    return payload;
   }
 
-  const totalAcross = questsWithStats.reduce((sum, q) => sum + q.earned, 0);
-  const totalPara = document.createElement('p');
-  totalPara.innerHTML = `<strong>Total SGXP across quests:</strong> ${totalAcross}`;
-  logOutput.appendChild(totalPara);
+  async function postJson(path, body) {
+    const url = API_BASE_URL + path;
+    const options = {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      credentials: "include",
+      body: JSON.stringify(body || {})
+    };
+    const resp = await fetch(url, options);
+    return resp;
+  }
 
-  sorted.forEach(entry => {
-    const { id, quest_name, mission_summary, questTotal, earned } = entry;
-    const createdText = entry.createdAt ? new Date(entry.createdAt).toLocaleString() : '';
-    const percent = questTotal > 0 ? Math.min(100, Math.round((earned / questTotal) * 100)) : 0;
+  async function deleteRequest(path) {
+    const url = API_BASE_URL + path;
+    const options = {
+      method: "DELETE",
+      credentials: "include"
+    };
+    const resp = await fetch(url, options);
+    return resp;
+  }
 
-    let statusLabel;
-    let statusClass;
-    if (percent >= 100 && questTotal > 0) {
-      statusLabel = 'Completed';
-      statusClass = 'quest-status-complete';
-    } else if (earned > 0) {
-      statusLabel = 'In progress';
-      statusClass = 'quest-status-in-progress';
-    } else {
-      statusLabel = 'Not started';
-      statusClass = 'quest-status-not-started';
+  async function getJson(path) {
+    const url = API_BASE_URL + path;
+    const resp = await fetch(url, { credentials: "include" });
+    if (!resp.ok) {
+      throw new Error("GET " + path + " failed with " + resp.status);
+    }
+    return resp.json();
+  }
+
+  // ----- CLARIFYING FLOW ---------------------------------------------------
+  async function handleGenerateClick() {
+    const payload = buildBasePayload();
+    if (!payload) return;
+
+    state.basePayload = payload;
+
+    // Try calling /clarify-mission; if that fails, fall back to static questions.
+    let questions = [];
+    try {
+      const resp = await postJson("/clarify-mission", payload);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (Array.isArray(data.questions)) {
+          questions = data.questions;
+        }
+      }
+    } catch (err) {
+      console.warn("Clarify mission call failed; using static questions:", err);
     }
 
-    let tintClass;
-    if (percent >= 100) {
-      tintClass = 'quest-progress-100';
-    } else if (percent >= 75) {
-      tintClass = 'quest-progress-75';
-    } else if (percent >= 50) {
-      tintClass = 'quest-progress-50';
-    } else if (percent >= 25) {
-      tintClass = 'quest-progress-25';
-    } else {
-      tintClass = 'quest-progress-0';
+    if (!questions || questions.length === 0) {
+      questions = [
+        "Who is this mission for?",
+        "Where will this mission happen?",
+        "What does success look like for this mission?"
+      ];
     }
 
-    const card = document.createElement('div');
-    card.className = `quest-card log-entry-card ${tintClass}`;
-    card.innerHTML = `
-      <div class="log-card-header">
-        <div class="log-card-title-wrap">
-          <h4>${quest_name}</h4>
-          <div class="quest-status-pill ${statusClass}">
-            ${statusLabel}
-          </div>
-        </div>
-        <button
-          type="button"
-          class="delete-quest-btn"
-          aria-label="Delete this quest from your Suit Log"
-          title="Delete this quest from your Suit Log"
-        >&times;</button>
-      </div>
-      <p>${mission_summary}</p>
-      <p><strong>Created:</strong> ${createdText}</p>
-      <p class="quest-log-sgxp-line">
-        <strong>Quest SGXP:</strong> ${earned} / ${questTotal} (${percent}%)
-      </p>
-      <div class="quest-log-progress-track">
-        <div class="quest-log-progress-bar" style="width: ${percent}%;"></div>
-      </div>
-    `;
+    renderClarifyQuestions(questions);
+    showSection("clarify");
+  }
 
-    // Clicking the card opens quest detail
-    card.addEventListener('click', () => {
-      const detailUrl = `${API_BASE_URL}/quests/${id}?client_id=${encodeURIComponent(CLIENT_ID)}`;
-      fetch(detailUrl)
-        .then(r => r.json())
-        .then(data => {
-          currentQuestId = data.id;
-          displayQuest(data);
-          document.getElementById('log-section').style.display = 'none';
-        })
-        .catch(err => {
-          console.error('Error fetching quest details:', err);
-          alert('Failed to load the quest. Please try again.');
-        });
+  function renderClarifyQuestions(questions) {
+    state.clarifyQuestions = questions.slice();
+    questionsContainer.innerHTML = "";
+    questions.forEach((q, index) => {
+      const group = document.createElement("div");
+      group.className = "form-group";
+
+      const label = document.createElement("label");
+      label.textContent = q;
+      label.setAttribute("for", "clarify-q-" + index);
+
+      const input = document.createElement("input");
+      input.type = "text";
+      input.id = "clarify-q-" + index;
+      input.dataset.index = String(index);
+
+      group.appendChild(label);
+      group.appendChild(input);
+      questionsContainer.appendChild(group);
+    });
+  }
+
+  async function handleConfirmMission() {
+    if (!state.basePayload) {
+      showSection("form");
+      return;
+    }
+
+    const clarifications = {};
+    state.clarifyQuestions.forEach((q, index) => {
+      const input = document.getElementById("clarify-q-" + index);
+      if (input) {
+        clarifications["q" + index] = (input.value || "").trim();
+      }
     });
 
-    // Delete button (stop click from opening quest)
-    const deleteBtn = card.querySelector('.delete-quest-btn');
-    if (deleteBtn) {
-      deleteBtn.addEventListener('click', (evt) => {
-        evt.stopImmediatePropagation();
-        evt.stopPropagation();
-        evt.preventDefault();
-        const confirmed = window.confirm('Remove this quest from your Suit Log? This does not delete your real-world actions.');
-        if (!confirmed) return;
+    const payload = Object.assign({}, state.basePayload, {
+      clarifications
+    });
 
-        fetch(`${API_BASE_URL}/quests/${id}?client_id=${encodeURIComponent(CLIENT_ID)}`, {
-          method: 'DELETE',
-        })
-          .then(res => {
-            // Consider HTTP 200 and 204 as success; only treat other non‑OK statuses as errors
-            if (!res.ok && res.status !== 200 && res.status !== 204) {
-              throw new Error('Delete failed');
-            }
-            // Clear local progress for this quest
-            try {
-              const rawLocal = localStorage.getItem(PROGRESS_STORAGE_KEY);
-              if (rawLocal) {
-                const map = JSON.parse(rawLocal);
-                delete map[id];
-                localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(map));
-              }
-            } catch (e) {
-              console.warn('Unable to update local progress map after deletion', e);
-            }
-            // Remove from cached entries and re-render
-            lastFetchedSuitLogEntries = lastFetchedSuitLogEntries.filter(q => q.id !== id);
-            renderSuitLogEntries(lastFetchedSuitLogEntries, currentSuitLogSort);
-          })
-          .catch(err => {
-            console.error('Error deleting quest:', err);
-            alert('Sorry, I could not delete that quest. Please try again.');
-          });
+    try {
+      const resp = await postJson("/generate-quest", payload);
+      let questData;
+      if (resp.ok) {
+        questData = await resp.json();
+      } else {
+        console.warn("generate-quest returned non-OK status:", resp.status);
+      }
+      if (!questData) {
+        questData = buildLocalFallbackQuest(state.basePayload);
+      }
+
+      const quest = normaliseQuest(questData);
+      state.currentQuest = quest;
+      upsertSuitLogEntry(quest);
+      renderQuestView(quest);
+      renderSuitLog();
+      showSection("quest");
+    } catch (err) {
+      console.error("Error generating quest:", err);
+      alert("Suit OS JayNova hit a glitch while forging your quest. Try again in a moment.");
+    }
+  }
+
+  function buildLocalFallbackQuest(basePayload) {
+    const idea = (basePayload && basePayload.mission_idea) || "your world";
+    return {
+      id: 0,
+      created_at: "local-dev",
+      quest_name: "Operation Citizen Hero",
+      mission_summary: "Use your powers of curiosity and kindness to make a small but mighty change around " + idea + ".",
+      difficulty: "Easy",
+      estimated_duration_days: 7,
+      help_mode: (basePayload && basePayload.help_mode) || "supplies",
+      steps: [
+        { id: 1, title: "Find your adult ally", description: "Ask a trusted adult to help you plan a safe mission.", sgxp_reward: 10 },
+        { id: 2, title: "Clarify the challenge", description: "Write down what you want to change and why it matters.", sgxp_reward: 15 },
+        { id: 3, title: "Design a tiny first step", description: "Choose one small action you can take this week.", sgxp_reward: 20 },
+        { id: 4, title: "Take action", description: "Carry out your tiny step and notice what happens.", sgxp_reward: 25 },
+        { id: 5, title: "Reflect & share", description: "Tell someone what you did and how it felt.", sgxp_reward: 30 }
+      ],
+      reflection_prompts: [
+        "What did you notice when you took action?",
+        "How did other people respond?",
+        "What would you try next time?"
+      ],
+      safety_notes: [
+        "Always involve a trusted adult before taking action.",
+        "Stay in safe, familiar places when carrying out your mission."
+      ]
+    };
+  }
+
+  // ----- QUEST NORMALISATION & PROGRESS -----------------------------------
+  function normaliseQuest(raw) {
+    const steps = Array.isArray(raw.steps) ? raw.steps.map(function (s, idx) {
+      return {
+        id: typeof s.id === "number" ? s.id : idx + 1,
+        title: s.title || "Step " + (idx + 1),
+        description: s.description || "",
+        sgxp_reward: typeof s.sgxp_reward === "number" ? s.sgxp_reward : 10
+      };
+    }) : [];
+
+    const totalSgxp = steps.reduce(function (sum, s) {
+      return sum + (s.sgxp_reward || 0);
+    }, 0);
+
+    const createdAt = raw.created_at || new Date().toISOString();
+
+    const completed = Array.isArray(raw.completed_step_ids)
+      ? raw.completed_step_ids.slice()
+      : [];
+
+    let earned = 0;
+    if (completed.length && totalSgxp > 0) {
+      steps.forEach(function (s) {
+        if (completed.indexOf(s.id) !== -1) {
+          earned += s.sgxp_reward || 0;
+        }
       });
     }
+    const initialPercent = totalSgxp > 0 ? Math.round((earned / totalSgxp) * 100) : 0;
 
-    logOutput.appendChild(card);
+    return {
+      id: typeof raw.id === "number" ? raw.id : 0,
+      created_at: createdAt,
+      quest_name: raw.quest_name || "Citizen Hero Mission",
+      mission_summary: raw.mission_summary || "",
+      difficulty: raw.difficulty || "Easy",
+      estimated_duration_days: raw.estimated_duration_days || raw.estimated_duration || 14,
+      help_mode: raw.help_mode || "supplies",
+      steps: steps,
+      reflection_prompts: Array.isArray(raw.reflection_prompts) ? raw.reflection_prompts : [],
+      safety_notes: Array.isArray(raw.safety_notes) ? raw.safety_notes : [],
+      total_sgxp: totalSgxp,
+      completed_step_ids: completed,
+      earned_sgxp: earned,
+      completion_percent: initialPercent
+    };
+  }
+
+  function getBandClassForPercent(percent) {
+    if (percent >= 100) return "progress-band-100";
+    if (percent >= 80) return "progress-band-80";
+    if (percent >= 60) return "progress-band-60";
+    if (percent >= 40) return "progress-band-40";
+    if (percent >= 20) return "progress-band-20";
+    return "progress-band-0";
+  }
+
+  function syncQuestProgressFromSteps(quest, progressBarEl, summaryEl) {
+    const total = quest.total_sgxp || 0;
+    let earned = 0;
+    quest.steps.forEach(function (s) {
+      if (quest.completed_step_ids.indexOf(s.id) !== -1) {
+        earned += s.sgxp_reward || 0;
+      }
+    });
+    quest.earned_sgxp = earned;
+    const percent = total > 0 ? Math.round((earned / total) * 100) : 0;
+    quest.completion_percent = percent;
+
+    if (summaryEl) {
+      summaryEl.textContent = "Mission SGXP: " + earned + " / " + total + " (" + percent + "% complete)";
+    }
+    if (progressBarEl) {
+      progressBarEl.style.width = percent + "%";
+      progressBarEl.className = "progress-bar " + getBandClassForPercent(percent);
+    }
+  }
+
+  // ----- QUEST RENDERING ---------------------------------------------------
+  function renderQuestView(quest) {
+    questOutput.innerHTML = "";
+
+    const card = document.createElement("div");
+    card.className = "quest-card";
+
+    const title = document.createElement("h3");
+    title.textContent = quest.quest_name;
+
+    const meta = document.createElement("p");
+    meta.className = "hint";
+    const days = quest.estimated_duration_days || 14;
+    meta.textContent = "Difficulty: " + quest.difficulty + " • Estimated duration: " + days + " days";
+
+    const summary = document.createElement("p");
+    summary.textContent = quest.mission_summary;
+
+    const sgxpSummary = document.createElement("p");
+    sgxpSummary.className = "hint";
+
+    const progressContainer = document.createElement("div");
+    progressContainer.className = "progress-container";
+
+    const progressBar = document.createElement("div");
+    progressBar.className = "progress-bar";
+    progressContainer.appendChild(progressBar);
+
+    const stepsHeader = document.createElement("h4");
+    stepsHeader.textContent = "Mission Steps";
+
+    const stepsList = document.createElement("ul");
+    stepsList.className = "step-list";
+
+    quest.steps.forEach(function (step) {
+      const li = document.createElement("li");
+      li.className = "step-item";
+
+      const row = document.createElement("div");
+      row.className = "quest-step-row";
+
+      const main = document.createElement("div");
+      main.className = "quest-step-main";
+
+      const label = document.createElement("label");
+      label.textContent = step.title;
+
+      const desc = document.createElement("div");
+      desc.className = "hint";
+      desc.textContent = step.description;
+
+      main.appendChild(label);
+      main.appendChild(desc);
+
+      const controls = document.createElement("div");
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.dataset.stepId = String(step.id);
+
+      if (quest.completed_step_ids.indexOf(step.id) !== -1) {
+        checkbox.checked = true;
+        li.classList.add("step-completed");
+      }
+
+      const badge = document.createElement("span");
+      badge.className = "sgxp-badge";
+      badge.textContent = "+" + (step.sgxp_reward || 0) + " SGXP";
+
+      controls.appendChild(checkbox);
+      controls.appendChild(badge);
+
+      row.appendChild(main);
+      row.appendChild(controls);
+      li.appendChild(row);
+      stepsList.appendChild(li);
+
+      checkbox.addEventListener("change", function () {
+        const id = step.id;
+        const idx = quest.completed_step_ids.indexOf(id);
+        if (checkbox.checked) {
+          if (idx === -1) quest.completed_step_ids.push(id);
+          li.classList.add("step-completed");
+        } else {
+          if (idx !== -1) quest.completed_step_ids.splice(idx, 1);
+          li.classList.remove("step-completed");
+        }
+        syncQuestProgressFromSteps(quest, progressBar, sgxpSummary);
+        upsertSuitLogEntry(quest);
+        renderSuitLog();
+      });
+    });
+
+    syncQuestProgressFromSteps(quest, progressBar, sgxpSummary);
+
+    card.appendChild(title);
+    card.appendChild(meta);
+    card.appendChild(summary);
+    card.appendChild(progressContainer);
+    card.appendChild(sgxpSummary);
+    card.appendChild(stepsHeader);
+    card.appendChild(stepsList);
+
+    if (quest.reflection_prompts && quest.reflection_prompts.length) {
+      const reflHeader = document.createElement("h4");
+      reflHeader.textContent = "Reflection prompts";
+      const reflList = document.createElement("ul");
+      quest.reflection_prompts.forEach(function (prompt) {
+        const li = document.createElement("li");
+        li.textContent = prompt;
+        reflList.appendChild(li);
+      });
+      card.appendChild(reflHeader);
+      card.appendChild(reflList);
+    }
+
+    if (quest.safety_notes && quest.safety_notes.length) {
+      const safeHeader = document.createElement("h4");
+      safeHeader.textContent = "Safety notes";
+      const safeList = document.createElement("ul");
+      quest.safety_notes.forEach(function (note) {
+        const li = document.createElement("li");
+        li.textContent = note;
+        safeList.appendChild(li);
+      });
+      card.appendChild(safeHeader);
+      card.appendChild(safeList);
+    }
+
+    questOutput.appendChild(card);
+  }
+
+  // ----- SUIT LOG ----------------------------------------------------------
+  function upsertSuitLogEntry(quest) {
+    // If backend didn't assign an id, keep a single local entry per mission name.
+    const keyId = quest.id || 0;
+    const existingIndex = state.suitLog.findIndex(function (q) {
+      if (keyId !== 0) return q.id === keyId;
+      return q.id === 0 && q.quest_name === quest.quest_name && q.created_at === quest.created_at;
+    });
+    if (existingIndex === -1) {
+      state.suitLog.unshift(cloneQuestForLog(quest));
+    } else {
+      state.suitLog[existingIndex] = cloneQuestForLog(quest);
+    }
+  }
+
+  function cloneQuestForLog(quest) {
+    return {
+      id: quest.id,
+      created_at: quest.created_at,
+      quest_name: quest.quest_name,
+      mission_summary: quest.mission_summary,
+      help_mode: quest.help_mode,
+      difficulty: quest.difficulty,
+      total_sgxp: quest.total_sgxp,
+      earned_sgxp: quest.earned_sgxp,
+      completion_percent: quest.completion_percent
+    };
+  }
+
+  function getStatusForPercent(percent) {
+    if (percent >= 100) return { text: "Complete", cls: "quest-status-complete" };
+    if (percent > 0) return { text: "In progress", cls: "quest-status-in-progress" };
+    return { text: "Not started", cls: "quest-status-not-started" };
+  }
+
+  function getLogTintClass(percent) {
+    if (percent >= 100) return "quest-progress-100";
+    if (percent >= 75) return "quest-progress-75";
+    if (percent >= 50) return "quest-progress-50";
+    if (percent >= 25) return "quest-progress-25";
+    return "quest-progress-0";
+  }
+
+  function getSortedSuitLog() {
+    const items = state.suitLog.slice();
+    const mode = state.sortMode;
+    if (mode === "oldest") {
+      items.sort(function (a, b) {
+        return new Date(a.created_at) - new Date(b.created_at);
+      });
+    } else if (mode === "quest-sgxp-high") {
+      items.sort(function (a, b) {
+        return (b.total_sgxp || 0) - (a.total_sgxp || 0);
+      });
+    } else if (mode === "quest-sgxp-low") {
+      items.sort(function (a, b) {
+        return (a.total_sgxp || 0) - (b.total_sgxp || 0);
+      });
+    } else {
+      // recent
+      items.sort(function (a, b) {
+        return new Date(b.created_at) - new Date(a.created_at);
+      });
+    }
+    return items;
+  }
+
+  function renderSuitLog() {
+    logOutput.innerHTML = "";
+    const quests = getSortedSuitLog();
+    if (!quests.length) {
+      const empty = document.createElement("p");
+      empty.className = "hint";
+      empty.textContent = "No missions logged yet. Forge a quest to start your Suit Log.";
+      logOutput.appendChild(empty);
+      return;
+    }
+
+    quests.forEach(function (quest) {
+      const card = document.createElement("div");
+      card.className = "quest-card log-entry-card " + getLogTintClass(quest.completion_percent || 0);
+      card.dataset.questId = String(quest.id || 0);
+
+      const header = document.createElement("div");
+      header.className = "log-card-header";
+
+      const titleWrap = document.createElement("div");
+      titleWrap.className = "log-card-title-wrap";
+
+      const title = document.createElement("h4");
+      title.textContent = quest.quest_name;
+
+      const statusInfo = getStatusForPercent(quest.completion_percent || 0);
+      const statusPill = document.createElement("span");
+      statusPill.className = "quest-status-pill " + statusInfo.cls;
+      statusPill.textContent = statusInfo.text;
+
+      titleWrap.appendChild(title);
+      titleWrap.appendChild(statusPill);
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.type = "button";
+      deleteBtn.className = "delete-quest-btn";
+      deleteBtn.textContent = "×";
+
+      header.appendChild(titleWrap);
+      header.appendChild(deleteBtn);
+
+      const meta = document.createElement("p");
+      meta.className = "hint";
+      const when = quest.created_at ? new Date(quest.created_at) : null;
+      const whenText = when ? when.toLocaleString() : "just now";
+      meta.textContent =
+        "Forged: " + whenText + " • Help mode: " + (quest.help_mode || "supplies") + " • Difficulty: " + (quest.difficulty || "Easy");
+
+      const sgxpLine = document.createElement("div");
+      sgxpLine.className = "quest-log-sgxp-line";
+      const total = quest.total_sgxp || 0;
+      const earned = quest.earned_sgxp || 0;
+      const pct = quest.completion_percent || 0;
+      sgxpLine.textContent = "Quest SGXP: " + earned + " / " + total + " (" + pct + "%)";
+
+      const track = document.createElement("div");
+      track.className = "quest-log-progress-track";
+
+      const bar = document.createElement("div");
+      bar.className = "quest-log-progress-bar";
+      bar.style.width = pct + "%";
+      track.appendChild(bar);
+
+      card.appendChild(header);
+      card.appendChild(meta);
+      card.appendChild(sgxpLine);
+      card.appendChild(track);
+
+      card.addEventListener("click", function () {
+        // Drill into this mission in the Mission view
+        if (state.currentQuest && state.currentQuest.id === quest.id) {
+          showSection("quest");
+          return;
+        }
+        // For now, just show the most recently generated quest; in a future
+        // revision we could round-trip to the backend and re-render exactly.
+        if (state.currentQuest) {
+          renderQuestView(state.currentQuest);
+          showSection("quest");
+        }
+      });
+
+      deleteBtn.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        handleDeleteQuest(quest);
+      });
+
+      logOutput.appendChild(card);
+    });
+  }
+
+  async function handleDeleteQuest(quest) {
+    // Optimistically remove from local Suit Log + refresh UI
+    const id = quest.id || 0;
+    const before = state.suitLog.length;
+    state.suitLog = state.suitLog.filter(function (q) {
+      if (id !== 0) return q.id !== id;
+      // Local-dev quests: match on name + created_at
+      return !(q.id === 0 && q.quest_name === quest.quest_name && q.created_at === quest.created_at);
+    });
+    const after = state.suitLog.length;
+
+    if (after !== before) {
+      renderSuitLog();
+    }
+
+    if (id === 0) {
+      // No persistent id to delete; nothing else to do.
+      return;
+    }
+
+    try {
+      const query = state.clientId ? "?client_id=" + encodeURIComponent(state.clientId) : "";
+      const resp = await deleteRequest("/quests/" + encodeURIComponent(id) + query);
+      if (!resp.ok && resp.status !== 404) {
+        console.warn("Backend delete for quest", id, "returned status", resp.status);
+      }
+    } catch (err) {
+      console.warn("Network error while deleting quest", id, err);
+    }
+  }
+
+  async function clearSuitLog() {
+    // Optimistic local clear
+    state.suitLog = [];
+    renderSuitLog();
+
+    // Soft-call backend; even if it fails, we keep the local wipe.
+    try {
+      const query = state.clientId ? "?client_id=" + encodeURIComponent(state.clientId) : "";
+      const resp = await deleteRequest("/quests" + query);
+      if (!resp.ok) {
+        console.warn("Backend Clear Suit Log returned status", resp.status);
+      }
+    } catch (err) {
+      console.warn("Network error during Clear Suit Log:", err);
+    }
+  }
+
+  async function hydrateSuitLogFromBackend() {
+    try {
+      const query = state.clientId ? "?client_id=" + encodeURIComponent(state.clientId) : "";
+      const quests = await getJson("/quests" + query);
+      if (!Array.isArray(quests) || quests.length === 0) {
+        return;
+      }
+      state.suitLog = quests.map(normaliseQuest).map(cloneQuestForLog);
+      renderSuitLog();
+    } catch (err) {
+      console.warn("Suit Log hydration from backend failed:", err);
+    }
+  }
+
+  // ----- BACK BUTTON VISIBILITY -------------------------------------------
+  function wireBackButtonVisibility() {
+    if (!("IntersectionObserver" in window)) {
+      backBtnTop.style.display = "none";
+      return;
+    }
+
+    const observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.target !== backBtn) return;
+        if (entry.isIntersecting || logSection.style.display === "none") {
+          backBtnTop.style.display = "none";
+        } else {
+          backBtnTop.style.display = "";
+        }
+      });
+    }, {
+      root: null,
+      threshold: 0.01
+    });
+
+    observer.observe(backBtn);
+  }
+
+  // ----- EVENT WIRING ------------------------------------------------------
+  generateBtn.addEventListener("click", function () {
+    handleGenerateClick();
   });
 
-  // After rendering cards, update the visibility of the top back button
-  checkBackBtnVisibility();
-}
+  confirmMissionBtn.addEventListener("click", function () {
+    handleConfirmMission();
+  });
 
-// Listen for sort changes on Suit Logs
-document.addEventListener('DOMContentLoaded', () => {
-  const sortSelect = document.getElementById('suitLogSort');
-  if (sortSelect) {
-    sortSelect.addEventListener('change', (e) => {
-      currentSuitLogSort = e.target.value || 'recent';
-      renderSuitLogEntries(lastFetchedSuitLogEntries, currentSuitLogSort);
-    });
-  }
+  newQuestBtn.addEventListener("click", function () {
+    // Reset clarifying state but keep form values.
+    state.basePayload = null;
+    state.clarifyQuestions = [];
+    questionsContainer.innerHTML = "";
+    showSection("form");
+  });
 
-  const deleteAllBtn = document.getElementById('deleteAllQuestsBtn');
-  if (deleteAllBtn) {
-    deleteAllBtn.addEventListener('click', () => {
-      const confirmed = window.confirm('Clear your Suit Log? This only removes saved quests here – your real-world hero work stays with you.');
-      if (!confirmed) return;
+  viewLogBtn.addEventListener("click", function () {
+    renderSuitLog();
+    showSection("log");
+  });
 
-      fetch(`${API_BASE_URL}/quests?client_id=${encodeURIComponent(CLIENT_ID)}`, {
-        method: 'DELETE',
-      })
-        .then(res => {
-          // Consider HTTP 200 and 204 as success
-          if (!res.ok && res.status !== 200 && res.status !== 204) {
-            throw new Error('Delete all failed');
-          }
-          // Clear all local quest progress
-          try {
-            window.localStorage.removeItem(PROGRESS_STORAGE_KEY);
-          } catch (e) {
-            console.warn('Unable to clear local progress after bulk delete', e);
-          }
-          lastFetchedSuitLogEntries = [];
-          renderSuitLogEntries([], currentSuitLogSort);
-        })
-        .catch(err => {
-          console.error('Error clearing Suit Log:', err);
-          alert('Sorry, I could not clear your Suit Log. Please try again.');
-        });
-    });
-  }
-
-  // Register scroll and resize handlers to toggle the top back button
-  const logOutput = document.getElementById('log-output');
-  if (logOutput) {
-    logOutput.addEventListener('scroll', checkBackBtnVisibility);
-  }
-  window.addEventListener('resize', checkBackBtnVisibility);
-});
-
-// Back button from log view
-document.getElementById('backBtn').addEventListener('click', () => {
-  document.getElementById('log-section').style.display = 'none';
-  if (currentQuestId !== null) {
-    document.getElementById('quest-section').style.display = 'block';
-  } else {
-    document.getElementById('form-section').style.display = 'block';
-  }
-});
-
-// Back to mission from top of Suit Log view
-const backBtnTop = document.getElementById('backBtnTop');
-if (backBtnTop) {
-  backBtnTop.addEventListener('click', () => {
-    document.getElementById('log-section').style.display = 'none';
-    if (currentQuestId != null) {
-      document.getElementById('quest-section').style.display = 'block';
+  backBtn.addEventListener("click", function () {
+    if (state.currentQuest) {
+      showSection("quest");
     } else {
-      document.getElementById('form-section').style.display = 'block';
+      showSection("form");
     }
   });
-}
 
-// Determine whether the top back button should be shown. If the
-// bottom Back to Mission button is off-screen (e.g. due to many log
-// entries), this function makes the top button visible. Otherwise it
-// hides it. The check uses viewport coordinates rather than the
-// scroll container because the bottom button is outside the log list.
-function checkBackBtnVisibility() {
-  const topBtn = document.getElementById('backBtnTop');
-  const bottomBtn = document.getElementById('backBtn');
-  if (!topBtn || !bottomBtn) return;
-  const bottomRect = bottomBtn.getBoundingClientRect();
-  // When bottom button’s bottom is within the viewport, hide the top button
-  if (bottomRect.bottom <= window.innerHeight && bottomRect.top >= 0) {
-    topBtn.style.display = 'none';
-  } else {
-    topBtn.style.display = 'block';
-  }
-}
+  backBtnTop.addEventListener("click", function () {
+    if (state.currentQuest) {
+      showSection("quest");
+    } else {
+      showSection("form");
+    }
+  });
+
+  deleteAllQuestsBtn.addEventListener("click", function () {
+    if (!state.suitLog.length) return;
+    clearSuitLog();
+  });
+
+  suitLogSortSelect.addEventListener("change", function () {
+    state.sortMode = suitLogSortSelect.value || "recent";
+    renderSuitLog();
+  });
+
+  // ----- INITIALISATION ----------------------------------------------------
+  showSection("form");
+  wireBackButtonVisibility();
+  hydrateSuitLogFromBackend();
+})();

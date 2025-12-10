@@ -93,7 +93,7 @@ def get_quest_by_id(quest_id):
             SELECT id, session_id, created_at, quest_json
             FROM quests
             WHERE id = %s
-            """",
+            """,
             (quest_id,)
         )
         row = cur.fetchone()
@@ -118,7 +118,7 @@ def delete_quest(session_id, quest_id):
             """
             DELETE FROM quests
             WHERE id = %s AND session_id = %s;
-            """",
+            """,
             (quest_id, session_id),
         )
         deleted = cur.rowcount
@@ -136,7 +136,7 @@ def delete_all_quests(session_id):
             """
             DELETE FROM quests
             WHERE session_id = %s;
-            """",
+            """,
             (session_id,),
         )
         deleted = cur.rowcount
