@@ -482,6 +482,7 @@ function renderSuitLogEntries(entries, sortMode = 'recent') {
     if (deleteBtn) {
       deleteBtn.addEventListener('click', (evt) => {
         evt.stopPropagation();
+            evt.preventDefault();
         const confirmed = window.confirm('Remove this quest from your Suit Log? This does not delete your real-world actions.');
         if (!confirmed) return;
 
@@ -547,6 +548,7 @@ document.addEventListener('DOMContentLoaded', () => {
           } catch (e) {
             console.warn('Unable to clear local progress after bulk delete', e);
           }
+          
           lastFetchedSuitLogEntries = [];
           renderSuitLogEntries([], currentSuitLogSort);
         })
@@ -567,3 +569,17 @@ document.getElementById('backBtn').addEventListener('click', () => {
     document.getElementById('form-section').style.display = 'block';
   }
 });
+
+
+// Back to mission from top of Suit Log view
+const backBtnTop = document.getElementById('backBtnTop');
+if (backBtnTop) {
+  backBtnTop.addEventListener('click', () => {
+    document.getElementById('log-section').style.display = 'none';
+    if (currentQuestId != null) {
+      document.getElementById('quest-section').style.display = 'block';
+    } else {
+      document.getElementById('form-section').style.display = 'block';
+    }
+  });
+}
