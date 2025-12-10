@@ -74,7 +74,9 @@ function resetAll() {
   const defaultHelpRadio = document.querySelector('input[name="helpMode"][value="supplies"]');
   if (defaultHelpRadio) defaultHelpRadio.checked = true;
   // Clear clarifying answers
-  document.querySelectorAll('.clarify-answer').forEach(input => input.value = '');
+  document.querySelectorAll('.clarify-answer').forEach(input => {
+    input.value = '';
+  });
   // Clear questions container
   const questionsContainer = document.getElementById('questions-container');
   if (questionsContainer) questionsContainer.innerHTML = '';
@@ -116,6 +118,7 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
     if (data.questions && data.questions.length > 0) {
       displayClarifyingQuestions(data.questions);
     } else {
+      // If no clarifying questions are returned, jump straight to quest generation
       generateQuest(currentMissionPayload);
     }
   } catch (err) {
@@ -165,6 +168,9 @@ document.getElementById('confirmMissionBtn').addEventListener('click', () => {
   const inputs = document.querySelectorAll('.clarify-answer');
   const answers = [];
   inputs.forEach(input => answers.push(input.value));
+  if (!currentMissionPayload) {
+    currentMissionPayload = {};
+  }
   currentMissionPayload.clarifying_answers = answers;
   generateQuest(currentMissionPayload);
 });
@@ -216,13 +222,17 @@ function displayQuest(quest) {
     <h4>Steps</h4>
     <ol class="step-list"></ol>
     <h4>Reflection Prompts</h4>
-    <ul class="reflection-list">${Array.isArray(quest.reflection_prompts)
-      ? quest.reflection_prompts.map(p => `<li>${p}</li>`).join('')
-      : ''}</ul>
+    <ul class="reflection-list">${
+      Array.isArray(quest.reflection_prompts)
+        ? quest.reflection_prompts.map(p => `<li>${p}</li>`).join('')
+        : ''
+    }</ul>
     <h4>Safety Notes</h4>
-    <ul class="safety-list">${Array.isArray(quest.safety_notes)
-      ? quest.safety_notes.map(n => `<li>${n}</li>`).join('')
-      : ''}</ul>
+    <ul class="safety-list">${
+      Array.isArray(quest.safety_notes)
+        ? quest.safety_notes.map(n => `<li>${n}</li>`).join('')
+        : ''
+    }</ul>
     <p><strong>Total SGXP:</strong> <span class="sgxp-earned">0</span> / ${totalSGXP}</p>
   `;
 
@@ -309,8 +319,7 @@ document.getElementById('viewLogBtn').addEventListener('click', () => {
     });
 });
 
-
-
+// Render Suit Log entries with sorting and local SGXP progress
 function renderSuitLogEntries(entries, sortMode = 'recent') {
   const logOutput = document.getElementById('log-output');
   if (!logOutput) return;
@@ -322,7 +331,7 @@ function renderSuitLogEntries(entries, sortMode = 'recent') {
   }
 
   // Load local progress
-  const raw = localStorage.getItem('psc_citizen_hero_progress');
+  const raw = localStorage.getItem(PROGRESS_STORAGE_KEY);
   const progressMap = raw ? JSON.parse(raw) : {};
 
   const questsWithStats = entries.map(entry => {
@@ -330,7 +339,7 @@ function renderSuitLogEntries(entries, sortMode = 'recent') {
     const questTotal = steps.reduce((sum, s) => sum + parseInt(s.sgxp_reward || 0, 10), 0);
 
     const saved = progressMap[entry.id];
-    let earned = questTotal;
+    let earned = 0;
     if (saved && typeof saved.earned === 'number') {
       earned = saved.earned;
     } else if (saved && saved.stepStatus) {
@@ -404,6 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
 // Back button from log view
 document.getElementById('backBtn').addEventListener('click', () => {
   document.getElementById('log-section').style.display = 'none';

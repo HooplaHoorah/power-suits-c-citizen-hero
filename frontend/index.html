@@ -1,113 +1,175 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <meta charset="utf-8" />
-  <title>Power Suits C&trade;: Citizen Hero&trade;</title>
-  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Power Suits C™: Citizen Hero™</title>
   <style>
-    /* Base page styling */
-    body {
-      font-family: sans-serif;
-      margin: 0;
-      padding: 0;
-      background: #f5f5f5;
-      line-height: 1.5;
+    :root {
+      --bg: #050814;
+      --card-bg: #101522;
+      --accent: #007acc;
+      --accent-soft: #2196F3;
+      --accent-strong: #4caf50;
+      --border-subtle: #30364a;
+      --text-main: #f5f7ff;
+      --text-muted: #a0abc0;
     }
 
-    .container {
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 20px;
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-
-    h1 {
-      margin-top: 0;
-    }
-
-    /* Form styles */
-    .form-group {
-      margin-bottom: 15px;
-    }
-
-    .form-group label {
-      font-weight: bold;
-      display: block;
-      margin-bottom: 5px;
-    }
-
-    /* Generic form control styling – make ONLY text inputs full-width */
-    .form-group input[type="text"],
-    .form-group select,
-    .form-group textarea {
-      width: 100%;
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
+    * {
       box-sizing: border-box;
     }
 
-    /* Help mode radio layout */
-    .radio-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-      /* vertical space between options */
-      margin-top: 4px;
-    }
-
-    .help-mode-option {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.5rem;
+    body {
       margin: 0;
-      /* gap handles the spacing */
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #162447, #050814 55%);
+      color: var(--text-main);
+      min-height: 100vh;
     }
 
-    .help-mode-option input[type="radio"] {
-      margin-top: 0.2rem;
-      /* aligns dot with first line of text */
-      width: auto;
-      flex: 0 0 auto;
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px 16px 32px;
     }
 
-    .help-mode-option label {
-      flex: 1 1 auto;
+    h1 {
+      font-size: 1.9rem;
+      margin-bottom: 0.5rem;
+      text-align: center;
+      letter-spacing: 0.04em;
+    }
+
+    h2 {
+      font-size: 1.25rem;
+      margin: 1.25rem 0 0.75rem;
+    }
+
+    h3, h4 {
+      margin-top: 0;
+    }
+
+    .tm {
+      font-size: 0.55em;
+      vertical-align: super;
+    }
+
+    section {
+      margin-top: 16px;
+      padding: 18px 16px 20px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(10, 16, 32, 0.98));
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      box-shadow: 0 14px 40px rgba(15, 23, 42, 0.6);
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    input[type="text"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-subtle);
+      background: #050816;
+      color: var(--text-main);
+      font-size: 0.95rem;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 80px;
     }
 
     .hint {
       display: block;
-      font-size: 0.85em;
-      color: #666;
       margin-top: 4px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
     }
 
-    /* Removed default block display for radio group labels to allow inline layout with help mode options */
-    /* Additional specific styling for help-mode labels */
-    .help-mode-option label {
-      /* Let label flex within row and wrap naturally */
-      flex: 1 1 auto;
-      display: inline-block;
-      margin: 0;
+    .radio-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      margin-top: 4px;
     }
 
     .help-mode-option {
       display: flex;
       align-items: flex-start;
-      gap: 0.5rem;
-      margin: 4px 0;
+      gap: 0.4rem;
+      font-size: 0.9rem;
     }
 
-    .help-mode-option input[type="radio"] {
-      margin-top: 0.2rem;
+    .help-mode-option input {
+      margin-top: 3px;
     }
 
-    /* Layout for mission steps with SGXP badges */
-    .step-item {
-      margin-bottom: 0.75rem;
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      box-shadow: 0 10px 25px rgba(15, 118, 178, 0.45);
+      transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+    }
+
+    button:hover {
+      background: #005fa3;
+      transform: translateY(-1px);
+      box-shadow: 0 14px 30px rgba(37, 99, 235, 0.55);
+    }
+
+    button:active {
+      transform: translateY(0);
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.75);
+    }
+
+    button + button {
+      margin-left: 8px;
+    }
+
+    .quest-card {
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 18px 16px 16px;
+      background: var(--card-bg);
+      margin-top: 10px;
+    }
+
+    .quest-card h3 {
+      margin-bottom: 0.4rem;
+    }
+
+    .quest-card h4 {
+      margin-top: 1rem;
+      margin-bottom: 0.4rem;
+      font-size: 1rem;
+    }
+
+    .step-list {
+      padding-left: 1.2rem;
+    }
+
+    .step-item + .step-item {
+      margin-top: 0.4rem;
     }
 
     .quest-step-row {
@@ -125,13 +187,37 @@
       flex: 1 1 auto;
     }
 
-    /* Sort controls for Suit Logs */
+    .sgxp-badge {
+      background: var(--accent-soft);
+      color: #fff;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 0.78rem;
+      margin-left: 4px;
+      white-space: nowrap;
+    }
+
+    .progress-container {
+      background: rgba(15, 23, 42, 0.9);
+      border-radius: 99px;
+      overflow: hidden;
+      height: 12px;
+      margin: 10px 0 6px;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0;
+      background: var(--accent-strong);
+      transition: width 0.25s ease-out;
+    }
+
     .log-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 1rem;
-      margin-top: 20px;
       margin-bottom: 10px;
     }
 
@@ -142,86 +228,72 @@
     .log-sort {
       display: flex;
       align-items: center;
-      gap: 0.25rem;
-      font-size: 0.9em;
+      gap: 0.4rem;
+      font-size: 0.9rem;
     }
 
-    button {
-      background: #007acc;
-      color: #fff;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 1em;
+    .log-sort select {
+      min-width: 140px;
     }
 
-    button:hover {
-      background: #005fa3;
+    .footer {
+      margin-top: 18px;
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--text-muted);
     }
 
-    /* Quest card styles */
-    .quest-card {
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      padding: 20px;
-      background: #fafafa;
-      margin-top: 20px;
+    .footer span {
+      display: block;
+      margin-top: 2px;
     }
 
-    .quest-card h3 {
-      margin-top: 0;
-    }
-
-    .sgxp-badge {
-      background: #2196F3;
-      color: #fff;
-      border-radius: 10px;
-      padding: 2px 6px;
-      font-size: 0.8em;
-      margin-left: 4px;
-      white-space: nowrap;
-    }
-
-    .progress-container {
-      background: #e0e0e0;
-      border-radius: 4px;
-      overflow: hidden;
-      height: 12px;
-      margin: 10px 0;
-    }
-
-    .progress-bar {
-      height: 100%;
-      width: 0;
-      background: #4caf50;
-      transition: width 0.3s ease;
-    }
-
-    @media (max-width: 600px) {
+    @media (max-width: 640px) {
       .container {
-        padding: 10px;
+        padding-inline: 12px;
+      }
+
+      section {
+        padding-inline: 12px;
       }
 
       button {
         width: 100%;
+        justify-content: center;
+        text-align: center;
+      }
+
+      button + button {
+        margin-left: 0;
+        margin-top: 8px;
+      }
+
+      .log-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .quest-step-row {
+        flex-direction: column;
+        align-items: flex-start;
       }
     }
   </style>
 </head>
-
 <body>
   <div class="container">
     <h1>Power Suits C<span class="tm">&trade;</span>: Citizen Hero<span class="tm">&trade;</span></h1>
+
     <section id="form-section">
       <h2>Forge Your Hero Mission</h2>
-      <p class="hint"><strong>Suit OS JayNova:</strong> I'm here to help you forge your mission! Share a few details
-        below and I'll craft a quest just for you.</p>
+      <p class="hint"><strong>Suit OS JayNova:</strong> I'm here to help you forge your mission! Share a few details below and I'll craft a quest just for you.</p>
+
       <div class="form-group">
         <label for="nickname">Call sign</label>
-        <input id="nickname" type="text" />
+        <input id="nickname" type="text" autocomplete="off" />
         <span class="hint">Choose a fun hero alias for yourself.</span>
       </div>
+
       <div class="form-group">
         <label for="ageRange">Age range</label>
         <select id="ageRange">
@@ -232,16 +304,16 @@
         </select>
         <span class="hint">This helps tailor your mission to your comfort level.</span>
       </div>
+
       <div class="form-group">
         <label for="missionIdea">What's bugging you in your world?</label>
         <textarea id="missionIdea" rows="3"></textarea>
-        <span class="hint">Share a challenge in your community, school, environment or anything else you care
-          about.</span>
+        <span class="hint">Share a challenge in your community, school, environment or anything else you care about.</span>
       </div>
+
       <div class="form-group">
         <label>Help mode</label>
         <span class="hint">How would you like to help your cause?</span>
-
         <div class="radio-group">
           <div class="help-mode-option">
             <input type="radio" name="helpMode" id="helpModeSupplies" value="supplies" checked />
@@ -249,14 +321,12 @@
               Raise supplies – gather resources or donations.
             </label>
           </div>
-
           <div class="help-mode-option">
             <input type="radio" name="helpMode" id="helpModeAwareness" value="awareness" />
             <label for="helpModeAwareness">
               Raise awareness – spread the word about the issue.
             </label>
           </div>
-
           <div class="help-mode-option">
             <input type="radio" name="helpMode" id="helpModeHelpers" value="helpers" />
             <label for="helpModeHelpers">
@@ -265,23 +335,25 @@
           </div>
         </div>
       </div>
-      <p class="hint"><strong>Safety first:</strong> If you're under 18, enlist a trusted adult before taking on your
-        mission.</p>
+
+      <p class="hint"><strong>Safety first:</strong> If you're under 18, enlist a trusted adult before taking on your mission.</p>
       <button id="generateBtn">Boot Suit</button>
     </section>
+
     <section id="clarify-section" style="display: none;">
       <h2>Clarifying Questions</h2>
-      <p class="hint"><strong>Suit OS JayNova:</strong> I have a few questions to make sure I understand your mission
-        correctly.</p>
+      <p class="hint"><strong>Suit OS JayNova:</strong> I have a few questions to make sure I understand your mission correctly.</p>
       <div id="questions-container"></div>
       <button id="confirmMissionBtn">Confirm Mission</button>
     </section>
+
     <section id="quest-section" style="display: none;">
       <h2>Mission Brief</h2>
       <div id="quest-output"></div>
       <button id="newQuestBtn">Forge Another Quest</button>
       <button id="viewLogBtn">View Suit Log</button>
     </section>
+
     <section id="log-section" style="display: none;">
       <div class="log-header">
         <h2>Suit Logs</h2>
@@ -298,13 +370,15 @@
       <div id="log-output"></div>
       <button id="backBtn">Back to Mission</button>
     </section>
-    <footer class="text-center text-muted mt-4 mb-3" style="font-size: 0.8rem;">
-      &copy; 2025 Hoopla Hoorah. Power Suits C&trade;, Citizen Hero&trade;, Super Greatness Experience Points&trade;,
-      and SGXP&trade; are trademarks of Hoopla Hoorah. All rights reserved. Created by Richard A. Morgan.
+
+    <footer class="footer">
+      <span>&copy; 2025 Hoopla Hoorah.</span>
+      <span>Power Suits C&trade;, Citizen Hero&trade;, Super Greatness Experience Points&trade;, and SGXP&trade; are trademarks of Hoopla Hoorah.</span>
+      <span>All rights reserved. Created by Richard A. Morgan.</span>
     </footer>
   </div>
+
   <script src="config.js"></script>
   <script src="new_script.js"></script>
 </body>
-
 </html>
