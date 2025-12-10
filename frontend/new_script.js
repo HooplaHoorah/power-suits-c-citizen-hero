@@ -481,9 +481,10 @@ function renderSuitLogEntries(entries, sortMode = 'recent') {
     const deleteBtn = card.querySelector('.delete-quest-btn');
     if (deleteBtn) {
       deleteBtn.addEventListener('click', (evt) => {
+                  evt.stopImmediatePropagation();
         evt.stopPropagation();
             evt.preventDefault();
-        const confirmed = window.confirm('Remove this quest from your Suit Log? This does not delete your real-world actions.');
+                const confirmed = window.confirm('Remove this quest from your Suit Log? This does not delete your real-world actions.');
         if (!confirmed) return;
 
         fetch(`${API_BASE_URL}/quests/${id}?client_id=${encodeURIComponent(CLIENT_ID)}`, {
@@ -539,10 +540,10 @@ document.addEventListener('DOMContentLoaded', () => {
         method: 'DELETE',
       })
         .then(res => {
-          if (!res.ok && res.status !== 204) {
+        if (!res.ok && res.status !== 200 && res.status !== 204) {
             throw new Error('Delete all failed');
           }
-          // Clear all local quest progress
+          // Clear all local quest progres
           try {
             window.localStorage.removeItem(PROGRESS_STORAGE_KEY);
           } catch (e) {
