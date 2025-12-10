@@ -401,32 +401,26 @@
       .container {
         padding-inline: 12px;
       }
-
       section {
         padding-inline: 12px;
       }
-
       button {
         width: 100%;
         justify-content: center;
         text-align: center;
       }
-
       button + button {
         margin-left: 0;
         margin-top: 8px;
       }
-
       .log-header {
         flex-direction: column;
         align-items: flex-start;
       }
-
       .quest-step-row {
         flex-direction: column;
         align-items: flex-start;
       }
-
       .log-controls {
         width: 100%;
         justify-content: space-between;
@@ -438,16 +432,15 @@
   <div class="container">
     <h1>Power Suits C<span class="tm">&trade;</span>: Citizen Hero<span class="tm">&trade;</span></h1>
 
+    <!-- Mission creation form -->
     <section id="form-section">
       <h2>Forge Your Hero Mission</h2>
       <p class="hint"><strong>Suit OS JayNova:</strong> I'm here to help you forge your mission! Share a few details below and I'll craft a quest just for you.</p>
-
       <div class="form-group">
         <label for="nickname">Call sign</label>
         <input id="nickname" type="text" autocomplete="off" />
         <span class="hint">Choose a fun hero alias for yourself.</span>
       </div>
-
       <div class="form-group">
         <label for="ageRange">Age range</label>
         <select id="ageRange">
@@ -458,42 +451,34 @@
         </select>
         <span class="hint">This helps tailor your mission to your comfort level.</span>
       </div>
-
       <div class="form-group">
         <label for="missionIdea">What's bugging you in your world?</label>
         <textarea id="missionIdea" rows="3"></textarea>
         <span class="hint">Share a challenge in your community, school, environment or anything else you care about.</span>
       </div>
-
       <div class="form-group">
         <label>Help mode</label>
         <span class="hint">How would you like to help your cause?</span>
         <div class="radio-group">
           <div class="help-mode-option">
             <input type="radio" name="helpMode" id="helpModeSupplies" value="supplies" checked />
-            <label for="helpModeSupplies">
-              Raise supplies – gather resources or donations.
-            </label>
+            <label for="helpModeSupplies">Raise supplies – gather resources or donations.</label>
           </div>
           <div class="help-mode-option">
             <input type="radio" name="helpMode" id="helpModeAwareness" value="awareness" />
-            <label for="helpModeAwareness">
-              Raise awareness – spread the word about the issue.
-            </label>
+            <label for="helpModeAwareness">Raise awareness – spread the word about the issue.</label>
           </div>
           <div class="help-mode-option">
             <input type="radio" name="helpMode" id="helpModeHelpers" value="helpers" />
-            <label for="helpModeHelpers">
-              Organize helpers – rally people to join the mission.
-            </label>
+            <label for="helpModeHelpers">Organize helpers – rally people to join the mission.</label>
           </div>
         </div>
       </div>
-
       <p class="hint"><strong>Safety first:</strong> If you're under 18, enlist a trusted adult before taking on your mission.</p>
       <button id="generateBtn">Boot Suit</button>
     </section>
 
+    <!-- Clarifying questions section -->
     <section id="clarify-section" style="display: none;">
       <h2>Clarifying Questions</h2>
       <p class="hint"><strong>Suit OS JayNova:</strong> I have a few questions to make sure I understand your mission correctly.</p>
@@ -501,25 +486,27 @@
       <button id="confirmMissionBtn">Confirm Mission</button>
     </section>
 
+    <!-- Mission brief / quest section -->
     <section id="quest-section" style="display: none;">
       <h2>Mission Brief</h2>
       <div id="quest-output"></div>
-          <div id="sgxp-legend" class="sgxp-legend">
-      <p class="legend-title">SGXP Legend</p>
-      <ul class="legend-list">
-        <li><span class="legend-color" style="background: #64748b; display: inline-block; width: 0.8rem; height: 0.4rem; border-radius: 2px; margin-right: 0.3rem;"></span> 0%</li>
-        <li><span class="legend-color" style="background: #f59e0b; display: inline-block; width: 0.8rem; height: 0.4rem; border-radius: 2px; margin-right: 0.3rem;"></span> 20‑39%</li>
-        <li><span class="legend-color" style="background: #eab308; display: inline-block; width: 0.8rem; height: 0.4rem; border-radius: 2px; margin-right: 0.3rem;"></span> 40‑59%</li>
-        <li><span class="legend-color" style="background: #3b82f6; display: inline-block; width: 0.8rem; height: 0.4rem; border-radius: 2px; margin-right: 0.3rem;"></span> 60‑79%</li>
-        <li><span class="legend-color" style="background: #a855f7; display: inline-block; width: 0.8rem; height: 0.4rem; border-radius: 2 px; margin-right: 0.3rem;"></span> 80‑99%</li>
-        <li><span class="legend-color" style="background: #22c55e; display: inline-block; width: 0.8rem; height: 0.4rem; border-radius: 2px; margin-right: 0.3rem;"></span> 100%</li>
-      </ul>
-    </div>
-
+      <!-- SGXP color legend -->
+      <div id="sgxp-legend" class="sgxp-legend">
+        <p class="legend-title">SGXP Legend</p>
+        <ul class="legend-list">
+          <li><span class="legend-color" style="background: #64748b; display: inline-block; width: 0.8rem; height: 0.4rem; border-radius: 2px; margin-right: 0.3rem;"></span> 0%</li>
+          <li><span class="legend-color" style="background: #f59e0b; display: inline-block; width: 0.8rem; height: 0.4rem; border-radius: 2px; margin-right: 0.3rem;"></span> 20‑39%</li>
+          <li><span class="legend-color" style="background: #eab308; display: inline-block; width: 0.8rem; height: 0.4rem; border-radius: 2px; margin-right: 0.3rem;"></span> 40‑59%</li>
+          <li><span class="legend-color" style="background: #3b82f6; display: inline-block; width: 0.8rem; height: 0.4rem; border-radius: 2px; margin-right: 0.3rem;"></span> 60‑79%</li>
+          <li><span class="legend-color" style="background: #a855f7; display: inline-block; width: 0.8rem; height: 0.4rem; border-radius: 2px; margin-right: 0.3rem;"></span> 80‑99%</li>
+          <li><span class="legend-color" style="background: #22c55e; display: inline-block; width: 0.8rem; height: 0.4rem; border-radius: 2px; margin-right: 0.3rem;"></span> 100%</li>
+        </ul>
+      </div>
       <button id="newQuestBtn">Forge Another Quest</button>
       <button id="viewLogBtn">View Suit Log</button>
     </section>
 
+    <!-- Suit Log section -->
     <section id="log-section" style="display: none;">
       <div class="log-header">
         <h2>Suit Logs</h2>
@@ -534,13 +521,11 @@
             </select>
           </div>
           <button id="deleteAllQuestsBtn" class="delete-all-btn" type="button">Clear Suit Log</button>
-            <button id="backBtnTop">Back to Mission</button>
-          
-                  <
-          
+          <!-- Top back button shown when bottom back button is out of view -->
+          <button id="backBtnTop" style="display: none;">Back to Mission</button>
         </div>
       </div>
-      <div id="log-output"></div>
+      <div id="log-output" style="max-height: 450px; overflow-y: auto;"></div>
       <button id="backBtn">Back to Mission</button>
     </section>
 
@@ -550,7 +535,6 @@
       <span>All rights reserved. Created by Richard A. Morgan.</span>
     </footer>
   </div>
-
   <script src="config.js"></script>
   <script src="new_script.js"></script>
 </body>

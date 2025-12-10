@@ -1,3 +1,8 @@
+// Added from remote repository; this file contains the full
+// Citizen Hero frontend logic. Updated in v14 to fix deletion
+// error handling and add a dynamic top back button with SGXP
+// legend. This version is based on the upstream new_script.js.
+
 // Global variable to store mission payload during clarification
 let currentMissionPayload = null;
 let currentQuestId = null;
@@ -341,6 +346,8 @@ document.getElementById('viewLogBtn').addEventListener('click', () => {
       renderSuitLogEntries(lastFetchedSuitLogEntries, currentSuitLogSort);
       document.getElementById('quest-section').style.display = 'none';
       document.getElementById('log-section').style.display = 'block';
+      // Update top back button visibility on initial render
+      checkBackBtnVisibility();
     })
     .catch(err => {
       console.error('Error fetching quests:', err);
@@ -356,6 +363,8 @@ function renderSuitLogEntries(entries, sortMode = 'recent') {
 
   if (!Array.isArray(entries) || entries.length === 0) {
     logOutput.textContent = 'No quests found. Complete a mission to populate your Suit Log!';
+    // Ensure top back button is hidden when no entries
+    checkBackBtnVisibility();
     return;
   }
 
@@ -481,17 +490,18 @@ function renderSuitLogEntries(entries, sortMode = 'recent') {
     const deleteBtn = card.querySelector('.delete-quest-btn');
     if (deleteBtn) {
       deleteBtn.addEventListener('click', (evt) => {
-                  evt.stopImmediatePropagation();
+        evt.stopImmediatePropagation();
         evt.stopPropagation();
-            evt.preventDefault();
-                const confirmed = window.confirm('Remove this quest from your Suit Log? This does not delete your real-world actions.');
+        evt.preventDefault();
+        const confirmed = window.confirm('Remove this quest from your Suit Log? This does not delete your real-world actions.');
         if (!confirmed) return;
 
         fetch(`${API_BASE_URL}/quests/${id}?client_id=${encodeURIComponent(CLIENT_ID)}`, {
           method: 'DELETE',
         })
           .then(res => {
-            if (!res.ok && res.status !== 204) {
+            // Consider HTTP 200 and 204 as success; only treat other non‑OK statuses as errors
+            if (!res.ok && res.status !== 200 && res.status !== 204) {
               throw new Error('Delete failed');
             }
             // Clear local progress for this quest
@@ -518,6 +528,9 @@ function renderSuitLogEntries(entries, sortMode = 'recent') {
 
     logOutput.appendChild(card);
   });
+
+  // After rendering cards, update the visibility of the top back button
+  checkBackBtnVisibility();
 }
 
 // Listen for sort changes on Suit Logs
@@ -540,16 +553,16 @@ document.addEventListener('DOMContentLoaded', () => {
         method: 'DELETE',
       })
         .then(res => {
-        if (!res.ok && res.status !== 200 && res.status !== 204) {
+          // Consider HTTP 200 and 204 as success
+          if (!res.ok && res.status !== 200 && res.status !== 204) {
             throw new Error('Delete all failed');
           }
-          // Clear all local quest progres
+          // Clear all local quest progress
           try {
             window.localStorage.removeItem(PROGRESS_STORAGE_KEY);
           } catch (e) {
             console.warn('Unable to clear local progress after bulk delete', e);
           }
-          
           lastFetchedSuitLogEntries = [];
           renderSuitLogEntries([], currentSuitLogSort);
         })
@@ -559,6 +572,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
   }
+
+  // Register scroll and resize handlers to toggle the top back button
+  const logOutput = document.getElementById('log-output');
+  if (logOutput) {
+    logOutput.addEventListener('scroll', checkBackBtnVisibility);
+  }
+  window.addEventListener('resize', checkBackBtnVisibility);
 });
 
 // Back button from log view
@@ -571,7 +591,6 @@ document.getElementById('backBtn').addEventListener('click', () => {
   }
 });
 
-
 // Back to mission from top of Suit Log view
 const backBtnTop = document.getElementById('backBtnTop');
 if (backBtnTop) {
@@ -583,4 +602,22 @@ if (backBtnTop) {
       document.getElementById('form-section').style.display = 'block';
     }
   });
+}
+
+// Determine whether the top back button should be shown. If the
+// bottom Back to Mission button is off-screen (e.g. due to many log
+// entries), this function makes the top button visible. Otherwise it
+// hides it. The check uses viewport coordinates rather than the
+// scroll container because the bottom button is outside the log list.
+function checkBackBtnVisibility() {
+  const topBtn = document.getElementById('backBtnTop');
+  const bottomBtn = document.getElementById('backBtn');
+  if (!topBtn || !bottomBtn) return;
+  const bottomRect = bottomBtn.getBoundingClientRect();
+  // When bottom button’s bottom is within the viewport, hide the top button
+  if (bottomRect.bottom <= window.innerHeight && bottomRect.top >= 0) {
+    topBtn.style.display = 'none';
+  } else {
+    topBtn.style.display = 'block';
+  }
 }
