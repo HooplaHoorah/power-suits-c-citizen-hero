@@ -21,16 +21,18 @@ CORS(app, supports_credentials=True)
 if os.getenv("APP_ENV") == "production":
     db.init_schema()
 else:
-    # For local dev, fallback to SQLite if DATABASE_URL not set (optional)
+    # For local dev, fallback to skipping DB if DATABASE_URL is not set or Postgres is unavailable
     try:
         db.init_schema()
     except Exception as e:
         print(f"Postgres not configured, skipping DB init: {e}")
 
+
 @app.route('/healthz', methods=['GET'])
 def healthz():
-    """Simple health‑check endpoint used by deployment platforms."""
+    """Simple health-check endpoint used by deployment platforms."""
     return jsonify({"status": "ok"}), 200
+
 
 @app.route('/clarify-mission', methods=['POST'])
 def clarify_mission_endpoint():
@@ -38,6 +40,7 @@ def clarify_mission_endpoint():
     data = request.get_json() or {}
     questions = generate_clarifying_questions(data)
     return jsonify({"questions": questions})
+
 
 def _get_session_id():
     """Retrieve a session identifier for persisting quests.
@@ -67,6 +70,7 @@ def _get_session_id():
         session_id = str(uuid.uuid4())
     return session_id
 
+
 @app.route('/generate-quest', methods=['POST'])
 def generate_quest_endpoint():
     """Generate a quest, persist it to Postgres, and return the stored record."""
@@ -91,6 +95,7 @@ def generate_quest_endpoint():
     resp.set_cookie('session_id', session_id, httponly=True, samesite='Lax')
     return resp
 
+
 @app.route('/quests', methods=['GET'])
 def get_quests():
     """Retrieve all quests for the current session from Postgres."""
@@ -100,6 +105,7 @@ def get_quests():
     quests = db.list_quests(session_id)
     return jsonify(quests)
 
+
 @app.route('/quests/<int:quest_id>', methods=['GET'])
 def get_quest(quest_id):
     """Retrieve a single quest by its ID from Postgres."""
@@ -108,10 +114,52 @@ def get_quest(quest_id):
         return jsonify({"error": "Quest not found"}), 404
     return jsonify(quest)
 
+
+@app.route('/quests/<int:quest_id>', methods=['DELETE'])
+def delete_quest_endpoint(quest_id):
+    """Delete a single quest for the current session/client.
+
+    Returns 204 on success, 404 if not found (or owned by another client).
+    In environments without DATABASE_URL configured, this is treated as a
+    no-op success so the frontend UX stays simple.
+    """
+    if not os.getenv("DATABASE_URL"):
+        # No persistent storage in this environment; pretend delete succeeded.
+        return ('', 204)
+    session_id = _get_session_id()
+    try:
+        deleted = db.delete_quest(session_id, quest_id)
+    except Exception as e:
+        print(f"Error deleting quest {quest_id}: {e}")
+        return jsonify({"error": "Failed to delete quest"}), 500
+    if not deleted:
+        return jsonify({"error": "Quest not found"}), 404
+    return ('', 204)
+
+
+@app.route('/quests', methods=['DELETE'])
+def delete_all_quests_endpoint():
+    """Delete all quests for the current session/client.
+
+    Returns JSON with the number of quests removed; in environments without
+    DATABASE_URL configured, this is treated as a no-op success.
+    """
+    if not os.getenv("DATABASE_URL"):
+        return jsonify({"deleted": 0}), 200
+    session_id = _get_session_id()
+    try:
+        deleted_count = db.delete_all_quests(session_id)
+    except Exception as e:
+        print(f"Error deleting quests for session {session_id}: {e}")
+        return jsonify({"error": "Failed to delete quests"}), 500
+    return jsonify({"deleted": deleted_count}), 200
+
+
 # Serve the frontend entry point
 @app.route("/", methods=["GET"]) 
 def serve_frontend():
     return send_from_directory(app.static_folder, "index.html")
+
 
 if __name__ == '__main__':
     # Default to debug mode for local development
