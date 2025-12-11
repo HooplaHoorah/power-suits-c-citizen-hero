@@ -1,92 +1,109 @@
+
 import os
 import re
-from typing import Any, Dict
-
 import requests
 
 
-# Simple keyword → codename mapping for kid-friendly missions
-_KEYWORD_CODENAMES = {
-    "cat": "COZY PAWS",
-    "cats": "COZY PAWS",
-    "kitten": "COZY PAWS",
-    "kittens": "COZY PAWS",
-    "animal": "COZY PAWS",
-    "animals": "COZY PAWS",
-    "shelter": "COZY PAWS",
-    "dog": "BRAVE TAILS",
-    "dogs": "BRAVE TAILS",
-    "trash": "CLEAN STREETS",
-    "litter": "CLEAN STREETS",
-    "garbage": "CLEAN STREETS",
-    "recycle": "GREEN CYCLE",
-    "recycling": "GREEN CYCLE",
-    "park": "GREEN ROOTS",
-    "parks": "GREEN ROOTS",
-    "tree": "GREEN ROOTS",
-    "trees": "GREEN ROOTS",
-    "bully": "KINDNESS SHIELD",
-    "bullying": "KINDNESS SHIELD",
-    "hunger": "FULL PLATES",
-    "hungry": "FULL PLATES",
-    "food": "FULL PLATES",
-    "homeless": "SAFE HAVEN",
-    "homelessness": "SAFE HAVEN",
-    "library": "STORY SPARK",
-    "libraries": "STORY SPARK",
-}
-
-_STOPWORDS = {
-    "the", "a", "an", "and", "or", "but", "for", "of", "in", "on", "at", "to",
-    "from", "with", "about", "there", "are", "is", "was", "were", "be", "being",
-    "been", "have", "has", "had", "do", "does", "did", "so", "that", "this",
-    "these", "those", "just", "really", "very", "bunch", "lot", "lots",
+# Common filler words to ignore when building short codenames
+STOPWORDS = {
+    "a", "an", "the", "and", "or", "for", "of", "on", "in", "at", "to", "with",
+    "about", "around", "near", "my", "our", "their", "your", "this", "that",
+    "these", "those", "is", "are", "be", "being", "been", "there", "lots",
+    "bunch", "many", "very", "really", "just", "some"
 }
 
 
-def _generate_operation_codename(mission_idea: str) -> str:
-    """Derive a short "OPERATION ..." codename from the mission idea.
+def _clean_phrase(text: str) -> str:
+    """Trim whitespace and outer quotes from a phrase."""
+    t = (text or "").strip()
+    if len(t) >= 2 and t[0] in "\"'“”‘" and t[-1] in "\"'“”’":
+        t = t[1:-1].strip()
+    return t
 
-    Rules (in order):
-    1. If a known keyword appears (cats, litter, bullying, etc.), use its mapped codename.
-    2. Otherwise, strip punctuation, drop common stopwords, and take the first 1–2
-       meaningful words as the codename.
-    3. If nothing useful is found, fall back to "CITIZEN HERO".
+
+def _extract_core_topic(text: str) -> str:
+    """Derive a short, thematic phrase from the user's mission idea."""
+    if not text:
+        return "CITIZEN HERO"
+
+    # Remove wrapping quotes and trim to the first sentence when needed
+    t = _clean_phrase(text)
+    for sep in [".", "!", "?"]:
+        if sep in t:
+            t = t.split(sep, 1)[0]
+            break
+    t = t.strip()
+    if not t:
+        return "CITIZEN HERO"
+
+    lower = t.lower()
+
+    # A few hand-tuned themed shortcuts for common mission types
+    if any(word in lower for word in ("cat", "cats", "kitten", "kittens")):
+        # Matches the original cozy‑paws sample vibe but with your copy tweak
+        return "COMFY PAWS"
+    if any(word in lower for word in ("dog", "dogs", "puppy", "puppies")):
+        return "BRAVE PAWS"
+    if any(word in lower for word in ("animal shelter", "shelter animals")):
+        return "COZY PAWS"
+    if any(word in lower for word in ("trash", "litter", "garbage", "rubbish", "pollution")):
+        return "CLEAN SWEEP"
+    if any(word in lower for word in ("bully", "bullying", "kindness", "inclusion")):
+        return "KINDNESS SHIELD"
+
+    # Generic path: take up to two meaningful words (no stopwords) and uppercase them.
+    tokens = re.findall(r"[A-Za-z']+", t)
+    words = [w for w in tokens if w.lower() not in STOPWORDS]
+    if not words:
+        words = tokens or ["Hero", "Mission"]
+
+    core = " ".join(words[:2]).upper()
+    return core
+
+
+def _is_reasonable_codename(name: str) -> bool:
+    """Return True if the given name already looks like a short codename."""
+    if not name:
+        return False
+    stripped = name.strip()
+    # Reject if it is very long or obviously a full sentence with punctuation.
+    if len(stripped) > 40:
+        return False
+    if any(p in stripped for p in ".?!,;:"):
+        return False
+    return True
+
+
+def _build_operation_name(mission_idea: str, existing: str = "") -> str:
+    """Normalise quest names into an 'OPERATION ...' codename.
+
+    - If an existing quest_name from Raindrop already looks short and punchy,
+      we keep it but normalise casing and prefix.
+    - Otherwise we derive a compact codename from the mission_idea text.
     """
-    if not mission_idea:
-        return "OPERATION CITIZEN HERO"
+    if _is_reasonable_codename(existing):
+        base = (existing or "").upper()
+    else:
+        base = _extract_core_topic(mission_idea)
 
-    text = mission_idea.lower()
-
-    # 1) Keyword-based special cases
-    for keyword, codename in _KEYWORD_CODENAMES.items():
-        if keyword in text:
-            return f"OPERATION {codename}"
-
-    # 2) Generic fallback: first 1–2 non-stopwords
-    cleaned = re.sub(r"[^a-z0-9\s]", " ", text)
-    tokens = [t for t in cleaned.split() if t and t not in _STOPWORDS]
-
-    if tokens:
-        codename_words = [w.upper() for w in tokens[:2]]
-        return "OPERATION " + " ".join(codename_words)
-
-    # 3) Final safety net
-    return "OPERATION CITIZEN HERO"
+    if not base.startswith("OPERATION "):
+        return f"OPERATION {base}"
+    return base
 
 
-def generate_quest(data: Dict[str, Any]) -> Dict[str, Any]:
+def generate_quest(data):
     """Generate a quest based on the provided mission idea and help mode.
 
-    - Tries a RAINDROP SmartInference endpoint if configured via env vars.
-    - Always enforces a short, codename-style quest_name derived from mission_idea,
-      so it never mirrors the full "What's bugging you" paragraph.
-    - Falls back to a rule-based template when RAINDROP is unavailable.
+    The function first attempts to call a Raindrop SmartInference endpoint
+    if configured via RAINDROP_API_URL/RAINDROP_API_KEY. Whether or not that
+    succeeds, we ensure the returned quest_name is a short 'OPERATION ...'
+    codename instead of echoing the full problem paragraph.
     """
+    # Extract parameters from the incoming data dictionary
     mission_idea = (data.get("mission_idea") or "").strip()
     help_mode = data.get("help_mode", "supplies")
 
-    # Attempt to call a RAINDROP SmartInference endpoint
+    # Attempt to call a Raindrop SmartInference endpoint
     api_url = os.getenv("RAINDROP_API_URL")
     api_key = os.getenv("RAINDROP_API_KEY")
     if api_url and api_key:
@@ -102,24 +119,25 @@ def generate_quest(data: Dict[str, Any]) -> Dict[str, Any]:
             response = requests.post(api_url, json=payload, headers=headers, timeout=15)
             if response.ok:
                 quest = response.json()
-                # Make sure we always have a nice codename, even if the model
-                # echoes the full mission_idea back as the quest name.
-                if isinstance(quest, dict):
-                    quest_name = _generate_operation_codename(mission_idea or quest.get("mission_summary", ""))
-                    quest["quest_name"] = quest_name
-                    quest.setdefault("help_mode", help_mode)
+                if isinstance(quest, dict) and "steps" in quest:
+                    existing_name = (quest.get("quest_name") or "").strip()
+                    mission_for_name = mission_idea or quest.get("mission_summary", "")
+                    quest["quest_name"] = _build_operation_name(mission_for_name, existing_name)
                     return quest
-        except Exception as e:  # pragma: no cover - network issues
-            # Print any exceptions for debugging and fall back to local generation.
-            print(f"RAINDROP API error: {e}")
+        except Exception as exc:  # pragma: no cover - safety net
+            # Log the error and fall through to offline generation
+            print(f"RAINDROP API error: {exc}")
 
-    # Dynamic fallback rule-based quest generation
-    quest_name = _generate_operation_codename(mission_idea)
+    # Offline dynamic fallback: build a quest using local templates and
+    # the same Operation codename rules.
+    quest_name = _build_operation_name(mission_idea)
 
     if help_mode == "supplies":
         mission_summary = (
-            "Gather essential supplies to support your mission. Over the next two weeks, "
-            "you'll rally friends, family, and neighbors to collect what's needed."
+            f"Gather essential supplies to support your mission: "
+            f"{mission_idea or 'your chosen cause'}. "
+            "Over the next two weeks, you'll rally friends, family, and neighbors "
+            "to collect what's needed."
         )
         steps = [
             {
@@ -132,8 +150,8 @@ def generate_quest(data: Dict[str, Any]) -> Dict[str, Any]:
                 "id": 2,
                 "title": "Research what’s needed",
                 "description": (
-                    "Identify the types of supplies needed to address your mission. "
-                    "Make a list with your adult ally."
+                    "Identify the types of supplies needed to address "
+                    f"{mission_idea or 'your mission'}. Make a list with your adult ally."
                 ),
                 "sgxp_reward": 15,
             },
@@ -141,8 +159,8 @@ def generate_quest(data: Dict[str, Any]) -> Dict[str, Any]:
                 "id": 3,
                 "title": "Spread the word",
                 "description": (
-                    "Create flyers or social media posts asking for donations and "
-                    "explaining why they matter."
+                    "Create flyers or social media posts asking for donations "
+                    "and explaining why they matter."
                 ),
                 "sgxp_reward": 20,
             },
@@ -156,23 +174,24 @@ def generate_quest(data: Dict[str, Any]) -> Dict[str, Any]:
                 "id": 5,
                 "title": "Deliver and celebrate",
                 "description": (
-                    "Deliver the collected supplies to those affected by your mission "
-                    "and thank everyone who helped."
+                    "Deliver the collected supplies to those affected by "
+                    f"{mission_idea or 'your mission'} and thank everyone who helped."
                 ),
                 "sgxp_reward": 30,
             },
         ]
     elif help_mode == "awareness":
         mission_summary = (
-            "Raise awareness about an issue you care about. Over the next two weeks, "
-            "you’ll learn, create messages, and share them widely."
+            f"Raise awareness about {mission_idea or 'an issue you care about'}. "
+            "Over the next two weeks, you’ll learn, create messages, and share them widely."
         )
         steps = [
             {
                 "id": 1,
                 "title": "Learn about the issue",
                 "description": (
-                    "Read articles or watch videos to understand why this mission matters."
+                    "Read articles or watch videos to understand why "
+                    f"{mission_idea or 'this issue'} matters."
                 ),
                 "sgxp_reward": 10,
             },
@@ -180,7 +199,8 @@ def generate_quest(data: Dict[str, Any]) -> Dict[str, Any]:
                 "id": 2,
                 "title": "Plan your message",
                 "description": (
-                    "With your adult ally, decide the key facts and stories you want to share."
+                    "With your adult ally, decide the key facts and stories "
+                    "you want to share."
                 ),
                 "sgxp_reward": 15,
             },
@@ -188,7 +208,8 @@ def generate_quest(data: Dict[str, Any]) -> Dict[str, Any]:
                 "id": 3,
                 "title": "Create awareness materials",
                 "description": (
-                    "Design posters, social media posts, or presentations to spread the word."
+                    "Design posters, social media posts, or presentations "
+                    "to spread the word."
                 ),
                 "sgxp_reward": 20,
             },
@@ -204,21 +225,25 @@ def generate_quest(data: Dict[str, Any]) -> Dict[str, Any]:
                 "id": 5,
                 "title": "Gather feedback",
                 "description": (
-                    "Talk to peers about what they learned and how they feel about the mission."
+                    "Talk to peers about what they learned and how they feel "
+                    "about the mission."
                 ),
                 "sgxp_reward": 30,
             },
         ]
     elif help_mode == "helpers":
         mission_summary = (
-            "Organize helpers to tackle your mission. Over the next two weeks, you’ll "
-            "recruit volunteers and coordinate their efforts."
+            f"Organize helpers to tackle {mission_idea or 'your mission'}. "
+            "Over the next two weeks, you’ll recruit volunteers and coordinate their efforts."
         )
         steps = [
             {
                 "id": 1,
                 "title": "Identify tasks",
-                "description": "List out what needs to be done to make an impact.",
+                "description": (
+                    "List out what needs to be done to address "
+                    f"{mission_idea or 'your mission'}."
+                ),
                 "sgxp_reward": 10,
             },
             {
@@ -233,34 +258,40 @@ def generate_quest(data: Dict[str, Any]) -> Dict[str, Any]:
                 "id": 3,
                 "title": "Plan the work",
                 "description": (
-                    "With your team and adult ally, schedule when and where the tasks will happen."
+                    "With your team and adult ally, schedule when and where the tasks "
+                    "will happen."
                 ),
                 "sgxp_reward": 20,
             },
             {
                 "id": 4,
                 "title": "Take action together",
-                "description": "Lead your team as you carry out the tasks to make a difference.",
+                "description": (
+                    "Lead your team as you carry out the tasks to make a difference."
+                ),
                 "sgxp_reward": 25,
             },
             {
                 "id": 5,
                 "title": "Reflect and celebrate",
-                "description": "Thank your helpers and discuss what you accomplished together.",
+                "description": (
+                    "Thank your helpers and discuss what you accomplished together."
+                ),
                 "sgxp_reward": 30,
             },
         ]
     else:
         mission_summary = (
-            "Make a difference by acting on your mission idea. Over the next two weeks "
-            "you'll create your own mission plan."
+            f"Make a difference by acting on {mission_idea or 'your mission idea'}. "
+            "Over the next two weeks you'll create your own mission plan."
         )
         steps = [
             {
                 "id": 1,
                 "title": "Define your goal",
                 "description": (
-                    "With an adult ally, clarify what success looks like for your mission."
+                    "With an adult ally, clarify what success looks like for "
+                    f"{mission_idea or 'this mission'}."
                 ),
                 "sgxp_reward": 10,
             },
@@ -268,7 +299,8 @@ def generate_quest(data: Dict[str, Any]) -> Dict[str, Any]:
                 "id": 2,
                 "title": "Plan your approach",
                 "description": (
-                    "Decide whether you need supplies, awareness, or helpers and plan accordingly."
+                    "Decide whether you need supplies, awareness, or helpers "
+                    "and plan accordingly."
                 ),
                 "sgxp_reward": 15,
             },
@@ -288,7 +320,8 @@ def generate_quest(data: Dict[str, Any]) -> Dict[str, Any]:
                 "id": 5,
                 "title": "Share your impact",
                 "description": (
-                    "Tell others what you learned and how they can help with your mission."
+                    "Tell others what you learned and how they can help with "
+                    f"{mission_idea or 'this mission'}."
                 ),
                 "sgxp_reward": 30,
             },
@@ -302,7 +335,7 @@ def generate_quest(data: Dict[str, Any]) -> Dict[str, Any]:
         "help_mode": help_mode,
         "steps": steps,
         "reflection_prompts": [
-            "What surprised you while working on this mission?",
+            f"What surprised you while working on {mission_idea or 'this mission'}?",
             "How did teamwork or community support influence your mission?",
             "What would you do differently next time?",
         ],
@@ -317,18 +350,25 @@ def generate_quest(data: Dict[str, Any]) -> Dict[str, Any]:
 
 def generate_clarifying_questions(data):
     """Generate clarifying questions to help refine the mission."""
+    mission_idea = (data.get("mission_idea") or "").strip()
     help_mode = data.get("help_mode", "supplies")
 
+    # Core questions work for any mission
     questions = [
         "Who is the specific beneficiary of this mission?",
         "What is your timeline for completing this?",
     ]
 
+    # Tailor one extra question based on help mode
     if help_mode == "supplies":
         questions.append("What kind of supplies are most needed?")
     elif help_mode == "awareness":
         questions.append("Who is your target audience for raising awareness?")
     elif help_mode == "helpers":
         questions.append("How many helpers do you think you need?")
+
+    # If the mission idea is extremely short, nudge the player to expand it a bit.
+    if mission_idea and len(mission_idea.split()) < 6:
+        questions.append("Can you add one more detail about why this matters to you?")
 
     return questions
