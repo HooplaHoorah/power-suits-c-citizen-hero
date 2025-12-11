@@ -1,279 +1,88 @@
 import os
-import requests
 import re
+from typing import Any, Dict
+
+import requests
 
 
-def _make_operation_name(mission_idea: str) -> str:
+# Simple keyword → codename mapping for kid-friendly missions
+_KEYWORD_CODENAMES = {
+    "cat": "COZY PAWS",
+    "cats": "COZY PAWS",
+    "kitten": "COZY PAWS",
+    "kittens": "COZY PAWS",
+    "animal": "COZY PAWS",
+    "animals": "COZY PAWS",
+    "shelter": "COZY PAWS",
+    "dog": "BRAVE TAILS",
+    "dogs": "BRAVE TAILS",
+    "trash": "CLEAN STREETS",
+    "litter": "CLEAN STREETS",
+    "garbage": "CLEAN STREETS",
+    "recycle": "GREEN CYCLE",
+    "recycling": "GREEN CYCLE",
+    "park": "GREEN ROOTS",
+    "parks": "GREEN ROOTS",
+    "tree": "GREEN ROOTS",
+    "trees": "GREEN ROOTS",
+    "bully": "KINDNESS SHIELD",
+    "bullying": "KINDNESS SHIELD",
+    "hunger": "FULL PLATES",
+    "hungry": "FULL PLATES",
+    "food": "FULL PLATES",
+    "homeless": "SAFE HAVEN",
+    "homelessness": "SAFE HAVEN",
+    "library": "STORY SPARK",
+    "libraries": "STORY SPARK",
+}
+
+_STOPWORDS = {
+    "the", "a", "an", "and", "or", "but", "for", "of", "in", "on", "at", "to",
+    "from", "with", "about", "there", "are", "is", "was", "were", "be", "being",
+    "been", "have", "has", "had", "do", "does", "did", "so", "that", "this",
+    "these", "those", "just", "really", "very", "bunch", "lot", "lots",
+}
+
+
+def _generate_operation_codename(mission_idea: str) -> str:
+    """Derive a short "OPERATION ..." codename from the mission idea.
+
+    Rules (in order):
+    1. If a known keyword appears (cats, litter, bullying, etc.), use its mapped codename.
+    2. Otherwise, strip punctuation, drop common stopwords, and take the first 1–2
+       meaningful words as the codename.
+    3. If nothing useful is found, fall back to "CITIZEN HERO".
     """
-    Generate a short, punchy OPERATION-style quest name
-    from the user's mission idea. Used only when RAINDROP
-    SmartInference isn't available.
-
-    This helper looks for common themes (animals, bullying,
-    climate / environment, food drives, school, safety, etc.)
-    and falls back to a generic OPERATION + 1–2 keyword name.
-    """
-    idea = (mission_idea or "").strip().lower()
-    if not idea:
+    if not mission_idea:
         return "OPERATION CITIZEN HERO"
 
-    # Themed rules: if the mission mentions one of these topics,
-    # return a hand-crafted codename.
-    themed_rules = [
-        # Animals / shelters / pets
-        (
-            [
-                "cat",
-                "cats",
-                "kitten",
-                "kittens",
-                "dog",
-                "dogs",
-                "puppy",
-                "puppies",
-                "pet",
-                "pets",
-                "animal",
-                "animals",
-                "shelter",
-                "rescue",
-            ],
-            "OPERATION COZY PAWS",
-        ),
-        # Bullying / inclusion / kindness
-        (
-            [
-                "bully",
-                "bullying",
-                "bullied",
-                "teased",
-                "teasing",
-                "left out",
-                "excluded",
-                "inclusion",
-                "kindness",
-                "mean at school",
-                "picked on",
-            ],
-            "OPERATION KINDNESS SHIELD",
-        ),
-        # Food drive / hunger
-        (
-            [
-                "hunger",
-                "hungry",
-                "food drive",
-                "food bank",
-                "food pantry",
-                "pantry",
-                "meals",
-                "meal",
-                "groceries",
-                "soup kitchen",
-                "lunch debt",
-            ],
-            "OPERATION FULL PLATES",
-        ),
-        # Environment / climate / recycling / clean-ups
-        (
-            [
-                "climate",
-                "climate change",
-                "global warming",
-                "planet",
-                "earth",
-                "environment",
-                "pollution",
-                "emissions",
-                "carbon",
-                "recycle",
-                "recycling",
-                "trash",
-                "rubbish",
-                "litter",
-                "garbage",
-                "waste",
-                "plastic",
-                "cleanup",
-                "clean up",
-                "clean-up",
-                "park",
-                "beach",
-                "river",
-            ],
-            "OPERATION GREEN GUARDIANS",
-        ),
-        # Neighborhood safety / traffic
-        (
-            [
-                "violence",
-                "crime",
-                "safe",
-                "safety",
-                "unsafe",
-                "neighborhood watch",
-                "crosswalk",
-                "traffic",
-                "speeding",
-                "cars",
-                "drivers",
-            ],
-            "OPERATION SAFE STREETS",
-        ),
-        # Books / tutoring / homework help
-        (
-            [
-                "homework",
-                "tutor",
-                "tutoring",
-                "study group",
-                "reading",
-                "literacy",
-                "book",
-                "books",
-                "library",
-            ],
-            "OPERATION BRAIN BOOST",
-        ),
-        # School spirit / campus improvements
-        (
-            [
-                "school",
-                "class",
-                "classroom",
-                "teacher",
-                "teachers",
-                "students",
-                "student",
-                "principal",
-                "campus",
-            ],
-            "OPERATION SCHOOL SPARK",
-        ),
-    ]
+    text = mission_idea.lower()
 
-    for keywords, name in themed_rules:
-        for keyword in keywords:
-            if keyword in idea:
-                return name
+    # 1) Keyword-based special cases
+    for keyword, codename in _KEYWORD_CODENAMES.items():
+        if keyword in text:
+            return f"OPERATION {codename}"
 
-    # Fallback: derive a short codename from the text.
-    # Strip out common stopwords and keep the first 1–2 content words.
-    words = re.findall(r"[a-zA-Z']+", idea)
-    stopwords = {
-        "the",
-        "a",
-        "an",
-        "and",
-        "or",
-        "but",
-        "if",
-        "then",
-        "else",
-        "when",
-        "at",
-        "on",
-        "in",
-        "near",
-        "my",
-        "our",
-        "their",
-        "his",
-        "her",
-        "for",
-        "to",
-        "from",
-        "with",
-        "about",
-        "are",
-        "is",
-        "was",
-        "were",
-        "be",
-        "been",
-        "am",
-        "there",
-        "lots",
-        "lot",
-        "bunch",
-        "of",
-        "many",
-        "really",
-        "very",
-        "so",
-        "too",
-        "just",
-        "like",
-        "that",
-        "this",
-        "those",
-        "these",
-        "over",
-        "up",
-        "down",
-        "around",
-        "also",
-        "still",
-        "into",
-        "out",
-        "by",
-        "as",
-        "your",
-        "you",
-        "me",
-        "i",
-        "we",
-        "they",
-        "them",
-        "us",
-        "he",
-        "she",
-        "it",
-        "who",
-        "what",
-        "where",
-        "why",
-        "how",
-        "which",
-        "because",
-        "than",
-        "do",
-        "does",
-        "did",
-        "doing",
-        "can",
-        "could",
-        "should",
-        "would",
-        "will",
-        "want",
-        "dont",
-        "don't",
-        "know",
-        "start",
-        "need",
-        "needs",
-        "supplies",
-        "make",
-    }
-    keywords = [w for w in words if w.lower() not in stopwords]
-    if not keywords:
-        return "OPERATION CITIZEN HERO"
+    # 2) Generic fallback: first 1–2 non-stopwords
+    cleaned = re.sub(r"[^a-z0-9\s]", " ", text)
+    tokens = [t for t in cleaned.split() if t and t not in _STOPWORDS]
 
-    core = " ".join(w.upper() for w in keywords[:2])
-    return f"OPERATION {core}"
+    if tokens:
+        codename_words = [w.upper() for w in tokens[:2]]
+        return "OPERATION " + " ".join(codename_words)
+
+    # 3) Final safety net
+    return "OPERATION CITIZEN HERO"
 
 
-def generate_quest(data):
+def generate_quest(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Generate a quest based on the provided mission idea and help mode.
+
+    - Tries a RAINDROP SmartInference endpoint if configured via env vars.
+    - Always enforces a short, codename-style quest_name derived from mission_idea,
+      so it never mirrors the full "What's bugging you" paragraph.
+    - Falls back to a rule-based template when RAINDROP is unavailable.
     """
-    Generate a quest based on the provided mission idea and help mode.
-
-    Attempts to call a RAINDROP SmartInference endpoint if configured via
-    environment variables. If the call fails or is not configured, falls
-    back to a simple rule-based generator that personalises the mission
-    while keeping a short, codename-style quest_name.
-    """
-    # Extract parameters from the incoming data dictionary
     mission_idea = (data.get("mission_idea") or "").strip()
     help_mode = data.get("help_mode", "supplies")
 
@@ -291,24 +100,26 @@ def generate_quest(data):
                 "Authorization": f"Bearer {api_key}",
             }
             response = requests.post(api_url, json=payload, headers=headers, timeout=15)
-            # If the response is successful and looks like a quest, return it
             if response.ok:
                 quest = response.json()
-                if isinstance(quest, dict) and "quest_name" in quest and "steps" in quest:
+                # Make sure we always have a nice codename, even if the model
+                # echoes the full mission_idea back as the quest name.
+                if isinstance(quest, dict):
+                    quest_name = _generate_operation_codename(mission_idea or quest.get("mission_summary", ""))
+                    quest["quest_name"] = quest_name
+                    quest.setdefault("help_mode", help_mode)
                     return quest
-        except Exception as e:
-            # Print any exceptions for debugging and fall back to offline generator
+        except Exception as e:  # pragma: no cover - network issues
+            # Print any exceptions for debugging and fall back to local generation.
             print(f"RAINDROP API error: {e}")
 
-    # Offline fallback rule-based quest generation
-    quest_name = _make_operation_name(mission_idea)
+    # Dynamic fallback rule-based quest generation
+    quest_name = _generate_operation_codename(mission_idea)
 
-    # Determine summary and steps based on help mode
     if help_mode == "supplies":
         mission_summary = (
-            "Gather essential supplies to support your mission: "
-            f"{mission_idea}. Over the next two weeks, you'll rally friends, "
-            "family, and neighbors to collect what's needed."
+            "Gather essential supplies to support your mission. Over the next two weeks, "
+            "you'll rally friends, family, and neighbors to collect what's needed."
         )
         steps = [
             {
@@ -321,8 +132,8 @@ def generate_quest(data):
                 "id": 2,
                 "title": "Research what’s needed",
                 "description": (
-                    "Identify the types of supplies needed to address "
-                    f"{mission_idea}. Make a list with your adult ally."
+                    "Identify the types of supplies needed to address your mission. "
+                    "Make a list with your adult ally."
                 ),
                 "sgxp_reward": 15,
             },
@@ -345,15 +156,15 @@ def generate_quest(data):
                 "id": 5,
                 "title": "Deliver and celebrate",
                 "description": (
-                    "Deliver the collected supplies to those affected by "
-                    f"{mission_idea} and thank everyone who helped."
+                    "Deliver the collected supplies to those affected by your mission "
+                    "and thank everyone who helped."
                 ),
                 "sgxp_reward": 30,
             },
         ]
     elif help_mode == "awareness":
         mission_summary = (
-            f"Raise awareness about {mission_idea}. Over the next two weeks, "
+            "Raise awareness about an issue you care about. Over the next two weeks, "
             "you’ll learn, create messages, and share them widely."
         )
         steps = [
@@ -361,8 +172,7 @@ def generate_quest(data):
                 "id": 1,
                 "title": "Learn about the issue",
                 "description": (
-                    "Read articles or watch videos to understand why "
-                    f"{mission_idea} matters."
+                    "Read articles or watch videos to understand why this mission matters."
                 ),
                 "sgxp_reward": 10,
             },
@@ -370,8 +180,7 @@ def generate_quest(data):
                 "id": 2,
                 "title": "Plan your message",
                 "description": (
-                    "With your adult ally, decide the key facts and stories you "
-                    "want to share."
+                    "With your adult ally, decide the key facts and stories you want to share."
                 ),
                 "sgxp_reward": 15,
             },
@@ -379,8 +188,7 @@ def generate_quest(data):
                 "id": 3,
                 "title": "Create awareness materials",
                 "description": (
-                    "Design posters, social media posts, or presentations to "
-                    "spread the word."
+                    "Design posters, social media posts, or presentations to spread the word."
                 ),
                 "sgxp_reward": 20,
             },
@@ -396,25 +204,21 @@ def generate_quest(data):
                 "id": 5,
                 "title": "Gather feedback",
                 "description": (
-                    "Talk to peers about what they learned and how they feel "
-                    "about the mission."
+                    "Talk to peers about what they learned and how they feel about the mission."
                 ),
                 "sgxp_reward": 30,
             },
         ]
     elif help_mode == "helpers":
         mission_summary = (
-            f"Organize helpers to tackle {mission_idea}. Over the next two weeks, "
-            "you’ll recruit volunteers and coordinate their efforts."
+            "Organize helpers to tackle your mission. Over the next two weeks, you’ll "
+            "recruit volunteers and coordinate their efforts."
         )
         steps = [
             {
                 "id": 1,
                 "title": "Identify tasks",
-                "description": (
-                    "List out what needs to be done to address "
-                    f"{mission_idea}."
-                ),
+                "description": "List out what needs to be done to make an impact.",
                 "sgxp_reward": 10,
             },
             {
@@ -429,40 +233,34 @@ def generate_quest(data):
                 "id": 3,
                 "title": "Plan the work",
                 "description": (
-                    "With your team and adult ally, schedule when and where the "
-                    "tasks will happen."
+                    "With your team and adult ally, schedule when and where the tasks will happen."
                 ),
                 "sgxp_reward": 20,
             },
             {
                 "id": 4,
                 "title": "Take action together",
-                "description": (
-                    "Lead your team as you carry out the tasks to make a difference."
-                ),
+                "description": "Lead your team as you carry out the tasks to make a difference.",
                 "sgxp_reward": 25,
             },
             {
                 "id": 5,
                 "title": "Reflect and celebrate",
-                "description": (
-                    "Thank your helpers and discuss what you accomplished together."
-                ),
+                "description": "Thank your helpers and discuss what you accomplished together.",
                 "sgxp_reward": 30,
             },
         ]
     else:
         mission_summary = (
-            f"Make a difference by acting on {mission_idea}. Over the next two "
-            "weeks you'll create your own mission plan."
+            "Make a difference by acting on your mission idea. Over the next two weeks "
+            "you'll create your own mission plan."
         )
         steps = [
             {
                 "id": 1,
                 "title": "Define your goal",
                 "description": (
-                    "With an adult ally, clarify what success looks like for "
-                    f"{mission_idea}."
+                    "With an adult ally, clarify what success looks like for your mission."
                 ),
                 "sgxp_reward": 10,
             },
@@ -470,8 +268,7 @@ def generate_quest(data):
                 "id": 2,
                 "title": "Plan your approach",
                 "description": (
-                    "Decide whether you need supplies, awareness, or helpers "
-                    "and plan accordingly."
+                    "Decide whether you need supplies, awareness, or helpers and plan accordingly."
                 ),
                 "sgxp_reward": 15,
             },
@@ -491,8 +288,7 @@ def generate_quest(data):
                 "id": 5,
                 "title": "Share your impact",
                 "description": (
-                    "Tell others what you learned and how they can help with "
-                    f"{mission_idea}."
+                    "Tell others what you learned and how they can help with your mission."
                 ),
                 "sgxp_reward": 30,
             },
@@ -506,7 +302,7 @@ def generate_quest(data):
         "help_mode": help_mode,
         "steps": steps,
         "reflection_prompts": [
-            f"What surprised you while working on {mission_idea}?",
+            "What surprised you while working on this mission?",
             "How did teamwork or community support influence your mission?",
             "What would you do differently next time?",
         ],
@@ -520,13 +316,9 @@ def generate_quest(data):
 
 
 def generate_clarifying_questions(data):
-    """
-    Generate clarifying questions to help refine the mission.
-    """
-    mission_idea = data.get("mission_idea", "").strip()
+    """Generate clarifying questions to help refine the mission."""
     help_mode = data.get("help_mode", "supplies")
 
-    # Mock questions based on help mode
     questions = [
         "Who is the specific beneficiary of this mission?",
         "What is your timeline for completing this?",
