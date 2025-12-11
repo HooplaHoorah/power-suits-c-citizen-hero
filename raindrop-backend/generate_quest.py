@@ -1,135 +1,269 @@
-
 import os
-import re
-import requests
+from typing import Any, Dict
+
+# NOTE: This version is fully offline (no RAINDROP calls).
+# It always produces a short 'OPERATION ...' codename, based on themes,
+# and NEVER reuses the raw mission text for the operation title.
 
 
-# Common filler words to ignore when building short codenames
-STOPWORDS = {
-    "a", "an", "the", "and", "or", "for", "of", "on", "in", "at", "to", "with",
-    "about", "around", "near", "my", "our", "their", "your", "this", "that",
-    "these", "those", "is", "are", "be", "being", "been", "there", "lots",
-    "bunch", "many", "very", "really", "just", "some"
-}
+# ---------------------------------------------------------------------------
+# Operation codename helpers
+# ---------------------------------------------------------------------------
 
+def _select_codename(mission_idea: str) -> str:
+    """Pick a short codename based on loose keywords in the mission idea.
 
-def _clean_phrase(text: str) -> str:
-    """Trim whitespace and outer quotes from a phrase."""
-    t = (text or "").strip()
-    if len(t) >= 2 and t[0] in "\"'“”‘" and t[-1] in "\"'“”’":
-        t = t[1:-1].strip()
-    return t
-
-
-def _extract_core_topic(text: str) -> str:
-    """Derive a short, thematic phrase from the user's mission idea."""
-    if not text:
-        return "CITIZEN HERO"
-
-    # Remove wrapping quotes and trim to the first sentence when needed
-    t = _clean_phrase(text)
-    for sep in [".", "!", "?"]:
-        if sep in t:
-            t = t.split(sep, 1)[0]
-            break
-    t = t.strip()
-    if not t:
-        return "CITIZEN HERO"
-
-    lower = t.lower()
-
-    # A few hand-tuned themed shortcuts for common mission types
-    if any(word in lower for word in ("cat", "cats", "kitten", "kittens")):
-        # Matches the original cozy‑paws sample vibe but with your copy tweak
-        return "COMFY PAWS"
-    if any(word in lower for word in ("dog", "dogs", "puppy", "puppies")):
-        return "BRAVE PAWS"
-    if any(word in lower for word in ("animal shelter", "shelter animals")):
-        return "COZY PAWS"
-    if any(word in lower for word in ("trash", "litter", "garbage", "rubbish", "pollution")):
-        return "CLEAN SWEEP"
-    if any(word in lower for word in ("bully", "bullying", "kindness", "inclusion")):
-        return "KINDNESS SHIELD"
-
-    # Generic path: take up to two meaningful words (no stopwords) and uppercase them.
-    tokens = re.findall(r"[A-Za-z']+", t)
-    words = [w for w in tokens if w.lower() not in STOPWORDS]
-    if not words:
-        words = tokens or ["Hero", "Mission"]
-
-    core = " ".join(words[:2]).upper()
-    return core
-
-
-def _is_reasonable_codename(name: str) -> bool:
-    """Return True if the given name already looks like a short codename."""
-    if not name:
-        return False
-    stripped = name.strip()
-    # Reject if it is very long or obviously a full sentence with punctuation.
-    if len(stripped) > 40:
-        return False
-    if any(p in stripped for p in ".?!,;:"):
-        return False
-    return True
-
-
-def _build_operation_name(mission_idea: str, existing: str = "") -> str:
-    """Normalise quest names into an 'OPERATION ...' codename.
-
-    - If an existing quest_name from Raindrop already looks short and punchy,
-      we keep it but normalise casing and prefix.
-    - Otherwise we derive a compact codename from the mission_idea text.
+    Mapping:
+      - Cats / small pets / strays      -> COMFY PAWS
+      - Dogs                            -> BRAVE PAWS
+      - Plants / gardens / trees        -> GREEN ROOTS
+      - Trash / litter / recycling      -> CLEAN SWEEP
+      - Climate / planet / environment  -> GREEN GUARDIANS
+      - Bullying / inclusion / kindness -> KINDNESS SHIELD
+      - Hunger / food drives            -> FULL PLATES
+      - Homelessness / shelters         -> SAFE HAVEN
+      - School / classroom / campus     -> SCHOOL SPARK
+      - Books / reading / libraries     -> STORY SPARK
+      - Safety / traffic / danger       -> SAFE STREETS
+      - Loneliness / belonging          -> BRIGHT SMILES
+      - Anything else                   -> CITIZEN HERO
     """
-    if _is_reasonable_codename(existing):
-        base = (existing or "").upper()
-    else:
-        base = _extract_core_topic(mission_idea)
+    text = (mission_idea or "").lower()
 
-    if not base.startswith("OPERATION "):
-        return f"OPERATION {base}"
-    return base
+    categories = [
+        # Animals: cats / small pets / strays
+        (
+            [
+                "cat",
+                "cats",
+                "kitten",
+                "kittens",
+                "stray",
+                "strays",
+                "pet",
+                "pets",
+                "animal shelter",
+                "shelter animals",
+            ],
+            "COMFY PAWS",
+        ),
+        # Animals: dogs
+        (
+            [
+                "dog",
+                "dogs",
+                "puppy",
+                "puppies",
+            ],
+            "BRAVE PAWS",
+        ),
+        # Plants / gardens / trees
+        (
+            [
+                "plant",
+                "plants",
+                "garden",
+                "gardens",
+                "yard",
+                "weeds",
+                "weed",
+                "forest",
+                "trees",
+                "tree",
+                "flowers",
+                "flower",
+                "bush",
+                "bushes",
+                "grass",
+                "overgrown",
+            ],
+            "GREEN ROOTS",
+        ),
+        # Trash / litter / recycling / pollution
+        (
+            [
+                "trash",
+                "litter",
+                "garbage",
+                "rubbish",
+                "recycle",
+                "recycling",
+                "pollution",
+                "plastic",
+                "waste",
+                "landfill",
+                "dump",
+            ],
+            "CLEAN SWEEP",
+        ),
+        # Climate / planet / environment
+        (
+            [
+                "climate",
+                "climate change",
+                "global warming",
+                "environment",
+                "planet",
+                "earth",
+                "emissions",
+                "carbon",
+                "ice caps",
+                "polar",
+                "heat wave",
+            ],
+            "GREEN GUARDIANS",
+        ),
+        # Bullying / kindness / inclusion
+        (
+            [
+                "bully",
+                "bullying",
+                "bullied",
+                "mean kids",
+                "teased",
+                "teasing",
+                "left out",
+                "excluded",
+                "unkind",
+                "kindness",
+                "inclusion",
+                "inclusive",
+                "respect",
+            ],
+            "KINDNESS SHIELD",
+        ),
+        # Hunger / food / lunches / food drives
+        (
+            [
+                "hunger",
+                "hungry",
+                "food drive",
+                "food bank",
+                "food pantry",
+                "pantry",
+                "lunch debt",
+                "meals",
+                "meal",
+                "groceries",
+                "school lunches",
+                "school lunch",
+                "lunch",
+                "lunches",
+            ],
+            "FULL PLATES",
+        ),
+        # Homelessness / housing / shelters
+        (
+            [
+                "homeless",
+                "homelessness",
+                "no home",
+                "no housing",
+                "unstable housing",
+                "shelter",
+                "shelters",
+            ],
+            "SAFE HAVEN",
+        ),
+        # School / classroom / campus
+        (
+            [
+                "school",
+                "schools",
+                "class",
+                "classroom",
+                "teacher",
+                "teachers",
+                "students",
+                "student",
+                "principal",
+                "campus",
+                "hallway",
+                "locker",
+                "illiteracy",
+                "homework",
+            ],
+            "SCHOOL SPARK",
+        ),
+        # Books / reading / libraries
+        (
+            [
+                "library",
+                "libraries",
+                "book",
+                "books",
+                "reading",
+                "read more",
+                "literacy",
+            ],
+            "STORY SPARK",
+        ),
+        # Safety / traffic / danger
+        (
+            [
+                "safety",
+                "unsafe",
+                "dangerous",
+                "violence",
+                "crime",
+                "traffic",
+                "crosswalk",
+                "speeding",
+                "cars",
+                "drivers",
+                "street light",
+                "stop sign",
+                "danger",
+            ],
+            "SAFE STREETS",
+        ),
+        # Loneliness / belonging / friendship
+        (
+            [
+                "lonely",
+                "alone",
+                "isolated",
+                "no friends",
+                "shy kids",
+                "new kid",
+                "friendship",
+                "belong",
+                "belonging",
+            ],
+            "BRIGHT SMILES",
+        ),
+    ]
+
+    for keywords, codename in categories:
+        for kw in keywords:
+            if kw in text:
+                return codename
+
+    # Neutral default if nothing matches
+    return "CITIZEN HERO"
 
 
-def generate_quest(data):
-    """Generate a quest based on the provided mission idea and help mode.
+def _build_operation_name(mission_idea: str) -> str:
+    """Return an 'OPERATION ...' name based on the mission idea."""
+    codename = _select_codename(mission_idea)
+    return f"OPERATION {codename}"
 
-    The function first attempts to call a Raindrop SmartInference endpoint
-    if configured via RAINDROP_API_URL/RAINDROP_API_KEY. Whether or not that
-    succeeds, we ensure the returned quest_name is a short 'OPERATION ...'
-    codename instead of echoing the full problem paragraph.
+
+# ---------------------------------------------------------------------------
+# Quest generation
+# ---------------------------------------------------------------------------
+
+def generate_quest(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Generate a quest payload for the frontend.
+
+    This offline generator:
+    - Always uses a short 'OPERATION ...' codename that does NOT echo the full
+      problem paragraph.
+    - Tailors mission_summary and steps based on help_mode.
     """
-    # Extract parameters from the incoming data dictionary
     mission_idea = (data.get("mission_idea") or "").strip()
-    help_mode = data.get("help_mode", "supplies")
+    help_mode = data.get("help_mode", "supplies") or "supplies"
 
-    # Attempt to call a Raindrop SmartInference endpoint
-    api_url = os.getenv("RAINDROP_API_URL")
-    api_key = os.getenv("RAINDROP_API_KEY")
-    if api_url and api_key:
-        try:
-            payload = {
-                "mission_idea": mission_idea,
-                "help_mode": help_mode,
-            }
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {api_key}",
-            }
-            response = requests.post(api_url, json=payload, headers=headers, timeout=15)
-            if response.ok:
-                quest = response.json()
-                if isinstance(quest, dict) and "steps" in quest:
-                    existing_name = (quest.get("quest_name") or "").strip()
-                    mission_for_name = mission_idea or quest.get("mission_summary", "")
-                    quest["quest_name"] = _build_operation_name(mission_for_name, existing_name)
-                    return quest
-        except Exception as exc:  # pragma: no cover - safety net
-            # Log the error and fall through to offline generation
-            print(f"RAINDROP API error: {exc}")
-
-    # Offline dynamic fallback: build a quest using local templates and
-    # the same Operation codename rules.
     quest_name = _build_operation_name(mission_idea)
 
     if help_mode == "supplies":
@@ -327,7 +461,7 @@ def generate_quest(data):
             },
         ]
 
-    quest = {
+    quest: Dict[str, Any] = {
         "quest_name": quest_name,
         "mission_summary": mission_summary,
         "difficulty": "Medium",
@@ -348,18 +482,16 @@ def generate_quest(data):
     return quest
 
 
-def generate_clarifying_questions(data):
+def generate_clarifying_questions(data: Dict[str, Any]):
     """Generate clarifying questions to help refine the mission."""
     mission_idea = (data.get("mission_idea") or "").strip()
-    help_mode = data.get("help_mode", "supplies")
+    help_mode = data.get("help_mode", "supplies") or "supplies"
 
-    # Core questions work for any mission
     questions = [
         "Who is the specific beneficiary of this mission?",
         "What is your timeline for completing this?",
     ]
 
-    # Tailor one extra question based on help mode
     if help_mode == "supplies":
         questions.append("What kind of supplies are most needed?")
     elif help_mode == "awareness":
@@ -367,7 +499,6 @@ def generate_clarifying_questions(data):
     elif help_mode == "helpers":
         questions.append("How many helpers do you think you need?")
 
-    # If the mission idea is extremely short, nudge the player to expand it a bit.
     if mission_idea and len(mission_idea.split()) < 6:
         questions.append("Can you add one more detail about why this matters to you?")
 
